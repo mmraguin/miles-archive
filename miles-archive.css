@@ -414,3 +414,12 @@ html, body {
 .sh-st.ok    { color: var(--success); }
 .sh-st.err   { color: var(--error); }
 .sh-st.info  { color: var(--text-2); }
+
+/* ── Config overlay additions ── */
+.vis-btn {
+  background: none; border: none; color: var(--text-3); cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 0;
+  white-space: nowrap; transition: color 0.18s; flex-shrink: 0;
+}
+.vis-btn:hover { color: var(--text-2); }

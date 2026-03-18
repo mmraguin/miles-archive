@@ -1,7 +1,12 @@
-// ── Credentials ───────────────────────────────────────────────────────────────
-const ANTHROPIC_KEY = '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';
-const GITHUB_TOKEN  = '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';
-const GITHUB_REPO   = 'mmraguin/miles-archive';
+// ── Credentials (localStorage — never hardcoded) ─────────────────────────────
+const CREDS = {
+  get anthropicKey() { return localStorage.getItem('ar_ant')  || ''; },
+  get githubToken()  { return localStorage.getItem('ar_gh')   || ''; },
+  get repo()         { return localStorage.getItem('ar_repo') || 'mmraguin/miles-archive'; },
+};
+function credsReady() {
+  return CREDS.anthropicKey.length > 10 && CREDS.githubToken.length > 10;
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const S = {
@@ -338,8 +343,8 @@ async function doFetch() {
   document.getElementById('fetched-pre').classList.remove('show');
   try {
     const r = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,
-      { headers: { 'Authorization': `Bearer ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' } }
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      { headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json' } }
     );
     if (!r.ok) throw new Error(r.status === 404 ? 'not found' : `error ${r.status}`);
     const data = await r.json();
@@ -393,8 +398,8 @@ function detectType(txt) {
 // ── GitHub save ───────────────────────────────────────────────────────────────
 async function getSHA(path) {
   const r = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`,
-    { headers: { 'Authorization': `Bearer ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' } }
+    `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+    { headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json' } }
   );
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`SHA check failed ${r.status}`);
@@ -420,11 +425,11 @@ async function saveEntry() {
     };
     if (sha) body.sha = sha;
     const r = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/contents/${S.pendingPath}`,
+      `https://api.github.com/repos/${CREDS.repo}/contents/${S.pendingPath}`,
       {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Authorization': `Bearer ${CREDS.githubToken}`,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
         },
@@ -468,7 +473,7 @@ async function callClaude(messages, retrying = false) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
+        'x-api-key': CREDS.anthropicKey,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
@@ -644,12 +649,74 @@ function restoreDraft(draft) {
 function init() {
   _initSessionMeta();
 
+  if (!credsReady()) {
+    setStat('', 'setup required');
+    addSys('tap ⚙ to enter your API keys');
+    openCfg();
+    return;
+  }
+
   const draft = loadDraft();
   if (draft && draft.messages.length > 2) {
     restoreDraft(draft);
     return;
   }
   startSess();
+}
+
+// ── Config overlay ────────────────────────────────────────────────────────────
+function openCfg() {
+  document.getElementById('cfg-ant').value  = CREDS.anthropicKey;
+  document.getElementById('cfg-gh').value   = CREDS.githubToken;
+  document.getElementById('cfg-repo').value = CREDS.repo;
+  document.getElementById('cfg-ov').classList.add('show');
+  // Focus first empty field
+  const ant = document.getElementById('cfg-ant');
+  const gh  = document.getElementById('cfg-gh');
+  setTimeout(() => (ant.value ? gh : ant).focus(), 80);
+}
+
+function closeCfg() {
+  document.getElementById('cfg-ov').classList.remove('show');
+}
+
+function ocCfg(e) {
+  if (e.target.id === 'cfg-ov') closeCfg();
+}
+
+function setCfgSt(type, txt) {
+  const el = document.getElementById('cfg-st');
+  el.className = `sh-st show ${type}`;
+  el.textContent = txt;
+}
+
+function saveCfg() {
+  const ant  = document.getElementById('cfg-ant').value.trim();
+  const gh   = document.getElementById('cfg-gh').value.trim();
+  const repo = document.getElementById('cfg-repo').value.trim();
+
+  if (!ant || ant.length < 10) { setCfgSt('err', 'Anthropic key missing'); return; }
+  if (!gh  || gh.length  < 10) { setCfgSt('err', 'GitHub token missing');  return; }
+
+  localStorage.setItem('ar_ant',  ant);
+  localStorage.setItem('ar_gh',   gh);
+  localStorage.setItem('ar_repo', repo || 'mmraguin/miles-archive');
+
+  setCfgSt('ok', 'saved');
+  setTimeout(() => {
+    closeCfg();
+    // If no session running yet, start one now
+    if (S.messages.length === 0) {
+      document.getElementById('chat').innerHTML = '';
+      startSess();
+    }
+  }, 800);
+}
+
+function tvField(id, btn) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? 'show' : 'hide';
 }
 
 // ── iOS keyboard fix ──────────────────────────────────────────────────────────

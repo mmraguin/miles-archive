@@ -18,6 +18,7 @@
       <button class="nav-btn" id="brief-btn" onclick="toggleBrief()">brief</button>
       <button class="nav-btn" onclick="openFetch()">fetch</button>
       <button class="nav-btn" onclick="newSess()">new</button>
+      <button class="nav-btn" id="cfg-btn" onclick="openCfg()">⚙</button>
     </div>
   </div>
 
@@ -73,6 +74,43 @@
     </div>
     <div class="sh-st" id="fetch-st"></div>
     <pre id="fetched-pre"></pre>
+  </div>
+</div>
+
+<!-- Config overlay -->
+<div class="ov" id="cfg-ov" onclick="ocCfg(event)">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-title">Config</div>
+
+    <div class="sh-field">
+      <div class="sh-lbl">Anthropic API Key</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="password" class="bare" id="cfg-ant" placeholder="sk-ant-…" autocomplete="off" style="flex:1">
+        <button class="vis-btn" onclick="tvField('cfg-ant',this)">show</button>
+      </div>
+      <div class="sh-note">From console.anthropic.com → API Keys. Stored on this device only.</div>
+    </div>
+
+    <div class="sh-field">
+      <div class="sh-lbl">GitHub Token</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="password" class="bare" id="cfg-gh" placeholder="ghp_…" autocomplete="off" style="flex:1">
+        <button class="vis-btn" onclick="tvField('cfg-gh',this)">show</button>
+      </div>
+      <div class="sh-note">Personal access token, repo scope. From GitHub → Settings → Developer settings.</div>
+    </div>
+
+    <div class="sh-field">
+      <div class="sh-lbl">Repository</div>
+      <input type="text" class="bare" id="cfg-repo" placeholder="username/repo-name">
+    </div>
+
+    <div class="sh-actions">
+      <button class="sh-cta" onclick="saveCfg()">Save</button>
+      <button class="sh-cancel" onclick="closeCfg()">cancel</button>
+      <span class="sh-st" id="cfg-st"></span>
+    </div>
   </div>
 </div>
 
