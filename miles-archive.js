@@ -80,7 +80,9 @@ function b64Decode(b64) {
 // ── Error mapping ─────────────────────────────────────────────────────────────
 function friendlyError(err) {
   const msg = err.message || '';
-  if (msg.includes('401'))          return 'API key invalid — check credentials';
+  if (msg === 'github_401')         return 'GitHub token invalid — tap ⚙ and update it';
+  if (msg === 'github_403')         return 'GitHub token lacks repo permission';
+  if (msg.includes('401'))          return 'Anthropic API key invalid — tap ⚙ to update';
   if (msg.includes('403'))          return 'API key lacks permissions';
   if (msg.includes('429'))          return 'Rate limited — wait a moment and retry';
   if (msg.includes('529') || msg.includes('overload')) return 'Claude is overloaded — try again in a moment';
@@ -402,6 +404,8 @@ async function getSHA(path) {
     { headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json' } }
   );
   if (r.status === 404) return null;
+  if (r.status === 401) throw new Error('github_401');
+  if (r.status === 403) throw new Error('github_403');
   if (!r.ok) throw new Error(`SHA check failed ${r.status}`);
   return (await r.json()).sha;
 }
@@ -436,7 +440,14 @@ async function saveEntry() {
         body: JSON.stringify(body),
       }
     );
-    if (!r.ok) { const e = await r.json(); throw new Error(e.message || `error ${r.status}`); }
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      if (r.status === 404) throw new Error('repo not found — check repo name in config');
+      if (r.status === 422) throw new Error('file conflict — try fetching and saving again');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
     setSaveSt('ok', 'saved');
     addSys(`saved → ${S.pendingPath}`);
     S.pendingEntry = null; S.pendingPath = null;
