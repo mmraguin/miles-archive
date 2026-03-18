@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Archive</title>
+<link rel="stylesheet" href="miles-archive.css">
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <div id="wordmark">
+      <div id="wm-main">Archive</div>
+      <div id="wm-date"></div>
+    </div>
+    <div id="nav">
+      <button class="nav-btn" id="brief-btn" onclick="toggleBrief()">brief</button>
+      <button class="nav-btn" onclick="openFetch()">fetch</button>
+      <button class="nav-btn" onclick="newSess()">new</button>
+    </div>
+  </div>
+
+  <div id="status">
+    <div id="dot"></div>
+    <span id="stat-txt">starting…</span>
+  </div>
+
+  <div class="rule"></div>
+  <div id="chat"></div>
+
+  <div id="save-bar">
+    <div id="save-top">
+      <span id="save-lbl">Entry ready</span>
+      <span id="save-path"></span>
+    </div>
+    <div id="save-row">
+      <button id="save-go" onclick="saveEntry()">Save to GitHub →</button>
+      <button id="save-no" onclick="dismissSave()">discard</button>
+      <span id="save-st"></span>
+    </div>
+  </div>
+
+  <div id="input-wrap">
+    <div id="input-inner">
+      <textarea id="inp" placeholder="write here…" rows="1"
+        onkeydown="hk(event)" oninput="rs(this)"></textarea>
+      <button id="send-btn" onclick="sendMsg()" aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 12H19M19 12L13 6M19 12L13 18" stroke="#080808" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Fetch overlay -->
+<div class="ov" id="fetch-ov" onclick="ocFetch(event)">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-title">Fetch</div>
+    <div class="sh-field">
+      <div class="sh-lbl">Path</div>
+      <input type="text" class="bare" id="fetch-inp"
+        placeholder="journal/daily/2026-03-17.md"
+        onkeydown="if(event.key==='Enter')doFetch()">
+    </div>
+    <div class="sh-actions">
+      <button class="sh-cta" onclick="doFetch()">Fetch</button>
+      <button class="sh-load" onclick="loadFetched()">load into chat</button>
+      <button class="sh-cancel" onclick="closeFetch()">close</button>
+    </div>
+    <div class="sh-st" id="fetch-st"></div>
+    <pre id="fetched-pre"></pre>
+  </div>
+</div>
+
+<script src="miles-archive.js"></script>
+</body>
+</html>
