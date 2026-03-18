@@ -10,14 +10,15 @@ function credsReady() {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const S = {
-  messages:     [],
-  sessionDate:  null,
-  sessionDow:   null,
-  sessionDay:   null,
-  brief:        false,
-  thinking:     false,
-  pendingEntry: null,
-  pendingPath:  null,
+  messages:      [],
+  sessionDate:   null,
+  sessionDow:    null,
+  sessionDay:    null,
+  brief:         false,
+  thinking:      false,
+  pendingEntry:  null,
+  pendingPath:   null,
+  existingEntry: null,  // today's entry already on GitHub, if any
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -149,12 +150,22 @@ Flags (only if mentioned): Panic attack, Near-syncope, Skin changes/purpura, GI 
   // ── Section: Daily protocol
   const protocol = `DAILY JOURNAL PROTOCOL
 1. OPEN: Use one of the session openers below. Fresh session only — do not re-open if context already exists.
+   If an existing entry was loaded, acknowledge the continuation naturally — e.g. "Welcome back. What else happened?" or "How did the rest of the day go?" — don't re-ask what was already covered.
 2. Let Miles give the overview freely. Do not rush.
 3. Reporter mode: one follow-up at a time. Follow threads — do not interrogate.
 4. Apply coaching posture as the session develops. Observations and pushback are welcome when earned.
 5. Transition to numbers when the narrative feels complete: "Okay — let's do the numbers."
-6. Collect all graymatter fields. Weave context from the day naturally into the narrative.
-7. When everything is collected, produce the formatted entry.
+   If graymatter was already collected in the existing entry, confirm or update scores rather than re-collecting from scratch.
+6. Collect all graymatter fields. Weave context from the full day into the narrative.
+7. When everything is collected, produce the merged entry.
+
+SAME-DAY CONTINUATION (when existing entry is loaded):
+- Do not repeat questions already answered in the existing entry.
+- The final output must be ONE combined entry — not two separate sections.
+- Narrative: weave both sessions into a single first-person account of the full day.
+- Graymatter: use the most accurate/updated scores across both sessions.
+- Flags: carry forward any flags from the earlier entry plus any new ones.
+- Notes: append new Notability content to existing notes.
 
 SESSION OPENERS (rotate — use one, vary across sessions, read the hour and energy):
 - "Ready when you are."
@@ -567,7 +578,7 @@ function newSess() {
 }
 
 function _clearAndStart() {
-  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.brief = false;
+  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.brief = false; S.existingEntry = null;
   document.getElementById('brief-btn').classList.remove('on');
   document.getElementById('chat').innerHTML = '';
   document.getElementById('save-bar').classList.remove('show');
@@ -584,6 +595,23 @@ function _initSessionMeta() {
   document.getElementById('wm-date').textContent = S.sessionDate;
 }
 
+// ── Fetch today's existing entry from GitHub (silent) ────────────────────────
+async function fetchTodayEntry() {
+  const path = `journal/daily/${S.sessionDate}.md`;
+  try {
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      { headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json' } }
+    );
+    if (r.status === 404) return null;
+    if (!r.ok) return null; // silent fail — don't block session start
+    const data = await r.json();
+    return b64Decode(data.content.replace(/\n/g, ''));
+  } catch(e) {
+    return null; // network issue — silent fail
+  }
+}
+
 // ── Start session ─────────────────────────────────────────────────────────────
 async function startSess() {
   setStat('thinking', '…');
@@ -591,20 +619,32 @@ async function startSess() {
   document.getElementById('send-btn').disabled = true;
   showDots();
 
-  // Pass hour context so Claude can pick a time-appropriate opener
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
+  // Silently check if today already has an entry
+  const existing = await fetchTodayEntry();
+  S.existingEntry = existing;
+
+  const openingContent = existing
+    ? `Start the journal session. It is ${timeHint} in Manila. Today already has an entry — load it as context and treat this as a continuation of the same day. When producing the final entry, merge and combine both sessions into one cohesive document — preserve the earlier narrative, append new material, and update graymatter to reflect the full day.
+
+EXISTING ENTRY:
+${existing}`
+    : `Start the journal session. It is ${timeHint} in Manila.`;
+
   try {
-    const opening = [{
-      role: 'user',
-      content: `Start the journal session. It is ${timeHint} in Manila.`,
-    }];
+    const opening = [{ role: 'user', content: openingContent }];
     const reply = await callClaude(opening);
     hideDots();
+
+    if (existing) {
+      addSys("today's entry loaded — continuing from earlier");
+    }
+
     addMsg('assistant', reply);
     S.messages = [
-      { role: 'user', content: `Start the journal session. It is ${timeHint} in Manila.` },
+      { role: 'user', content: openingContent },
       { role: 'assistant', content: reply },
     ];
     saveDraft();
