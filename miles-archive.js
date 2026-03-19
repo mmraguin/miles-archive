@@ -770,11 +770,36 @@ function tvField(id, btn) {
   btn.textContent = el.type === 'password' ? 'show' : 'hide';
 }
 
-// ── iOS keyboard fix ──────────────────────────────────────────────────────────
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    document.getElementById('app').style.height = window.visualViewport.height + 'px';
-  });
-}
+// ── iOS keyboard / viewport fix ──────────────────────────────────────────────
+(function() {
+  if (!window.visualViewport) return;
+
+  function onViewportChange() {
+    const vv     = window.visualViewport;
+    const app    = document.getElementById('app');
+    const isIOS  = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    if (isIOS) {
+      // Pin app to the visual viewport — keeps input above keyboard
+      app.style.height    = vv.height + 'px';
+      app.style.position  = 'fixed';
+      app.style.top       = vv.offsetTop + 'px';
+      app.style.left      = vv.offsetLeft + 'px';
+      app.style.width     = vv.width + 'px';
+    } else {
+      app.style.height = vv.height + 'px';
+    }
+
+    // Scroll chat to bottom after keyboard animation settles
+    setTimeout(() => {
+      const chat = document.getElementById('chat');
+      chat.scrollTop = chat.scrollHeight;
+    }, 100);
+  }
+
+  window.visualViewport.addEventListener('resize', onViewportChange);
+  window.visualViewport.addEventListener('scroll', onViewportChange);
+})();
 
 init();

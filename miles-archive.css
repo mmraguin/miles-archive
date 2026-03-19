@@ -33,7 +33,7 @@ html, body {
   font-family: 'DM Sans', sans-serif;
   font-size: 15px;
   line-height: 1.6;
-  overflow: clip;
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
 }
@@ -45,6 +45,8 @@ html, body {
   height: 100dvh;
   max-width: 680px;
   margin: 0 auto;
+  /* JS overrides position/height when keyboard is open on iOS */
+  box-sizing: border-box;
 }
 
 /* ── Header ── */
@@ -302,7 +304,8 @@ html, body {
   background: transparent; border: none;
   color: var(--text);
   font-family: 'DM Sans', sans-serif;
-  font-size: 15px; font-weight: 300; line-height: 1.5;
+  font-size: 16px; /* must be 16px+ to prevent iOS auto-zoom on focus */
+  font-weight: 300; line-height: 1.5;
   padding: 3px 0;
   resize: none; outline: none;
   max-height: 130px; min-height: 26px;
@@ -367,7 +370,8 @@ html, body {
   border-radius: 10px;
   color: var(--text);
   font-family: 'DM Mono', monospace;
-  font-size: 12px; font-weight: 300;
+  font-size: 16px; /* 16px prevents iOS zoom on focus */
+  font-weight: 300;
   padding: 11px 14px; outline: none; width: 100%;
   transition: border-color 0.2s;
   -webkit-appearance: none;
