@@ -47,8 +47,8 @@ def get_client() -> Garmin:
         garth.login(email, password)
         garth.save(str(GARTH_SESSION))
 
-    client = Garmin(tokenstore=str(GARTH_SESSION))
-    client.login()
+    client = Garmin()
+    client.login(tokenstore=str(GARTH_SESSION))
     return client
 
 
