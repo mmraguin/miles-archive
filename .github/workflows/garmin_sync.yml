@@ -2,21 +2,31 @@ name: Garmin Sync
 
 on:
   schedule:
-    - cron: '0 1 * * *'   # 1am UTC daily — adjust to run after midnight your time
-  workflow_dispatch:       # lets you trigger manually from GitHub UI
+    - cron: '0 6 * * *'    # 6am UTC = 2pm Manila
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Date to sync (YYYY-MM-DD). Leave blank for today.'
+        required: false
+        default: ''
 
 jobs:
   sync:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write      # needed to push commits back to the repo
+      contents: write
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      - name: Configure git
+        run: |
+          git config user.name "garmin-sync[bot]"
+          git config user.email "garmin-sync@noreply"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -26,24 +36,28 @@ jobs:
       - name: Install dependencies
         run: pip install garth garminconnect
 
-      - name: Restore Garmin session cache
-        id: cache-session
-        uses: actions/cache@v4
-        with:
-          path: ~/.garth
-          key: garmin-session-${{ github.run_id }}
-          restore-keys: garmin-session-
+      - name: Restore Garmin session from secret
+        run: |
+          mkdir -p ~/.garth
+          python3 - <<'EOF'
+          import base64, json, pathlib, os
+          raw = os.environ["GARTH_SESSION"]
+          files = json.loads(base64.b64decode(raw).decode())
+          for name, content in files.items():
+              (pathlib.Path.home() / ".garth" / name).write_bytes(base64.b64decode(content))
+          print("Session restored.")
+          EOF
+        env:
+          GARTH_SESSION: ${{ secrets.GARTH_SESSION }}
 
       - name: Run sync
         env:
-          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
-          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          SYNC_DATE: ${{ github.event.inputs.date }}
         run: python garmin_sync.py
 
-      - name: Commit and push changes
+      - name: Commit and push
         run: |
-          git config user.name "garmin-sync[bot]"
-          git config user.email "garmin-sync@noreply"
           git add journal/daily/
-          git diff --staged --quiet || git commit -m "garmin sync $(date +%F)"
+          git diff --staged --quiet && echo "Nothing to commit." && exit 0
+          git commit -m "garmin sync $(date -u +%Y-%m-%d)"
           git push
