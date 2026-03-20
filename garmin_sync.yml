@@ -1,0 +1,49 @@
+name: Garmin Sync
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 1am UTC daily — adjust to run after midnight your time
+  workflow_dispatch:       # lets you trigger manually from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write      # needed to push commits back to the repo
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install garth garminconnect
+
+      - name: Restore Garmin session cache
+        id: cache-session
+        uses: actions/cache@v4
+        with:
+          path: ~/.garth
+          key: garmin-session-${{ github.run_id }}
+          restore-keys: garmin-session-
+
+      - name: Run sync
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+        run: python garmin_sync.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "garmin-sync[bot]"
+          git config user.email "garmin-sync@noreply"
+          git add journal/daily/
+          git diff --staged --quiet || git commit -m "garmin sync $(date +%F)"
+          git push

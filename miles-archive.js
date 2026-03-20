@@ -18,7 +18,8 @@ const S = {
   thinking:      false,
   pendingEntry:  null,
   pendingPath:   null,
-  existingEntry: null,  // today's entry already on GitHub, if any
+  existingEntry: null,  // today's full file content from GitHub, if any
+  garminData:    null,  // health block extracted from today's file, injected into system prompt
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -102,6 +103,11 @@ function buildSysPrompt() {
 
   // ── Section: Context
   const context = `TODAY: ${dow}, ${date} (GMT+8, Manila).`;
+
+  // ── Section: Today's Garmin data (injected from sync file if available)
+  const garminToday = S.garminData
+    ? `TODAY'S HEALTH DATA (Garmin sync — use as live context; it will be prepended to the saved file automatically)\n${S.garminData}`
+    : '';
 
   // ── Section: Health
   const health = `HEALTH CONTEXT (carry always)
@@ -190,8 +196,6 @@ When Miles asks for a weekly or monthly review:
 When the interview is complete, output the entry wrapped in markers. Everything between the markers is saved to GitHub — make it clean.
 
 <<<ENTRY_START>>>
-# Daily Journal — ${dow}, ${date}
-
 ## Narrative
 [First person. Specific and honest. Written from what Miles shared, not generic filler.]
 
@@ -218,9 +222,6 @@ When the interview is complete, output the entry wrapped in markers. Everything 
 **Flags**
 [Only if triggered. Omit section entirely otherwise.]
 
-## Garmin
-[Only if data was provided. Omit otherwise.]
-
 ## Notes
 [Notability content or stray thoughts. Omit if none.]
 <<<ENTRY_END>>>
@@ -231,7 +232,7 @@ For weekly/monthly reviews and clinical summaries: use appropriate format, same 
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving his voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, health, meds, coaching, briefMode, graymatter, protocol, output, misc]
+  return [identity, context, garminToday, health, meds, coaching, briefMode, graymatter, protocol, output, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -399,26 +400,30 @@ function extractEntry(txt) {
   return txt.slice(s + 17, e).trim();
 }
 
-function detectType(txt) {
-  if (/psychiatrist/i.test(txt))   return 'psychiatrist';
-  if (/rheumatologist/i.test(txt)) return 'rheumatologist';
-  if (/weekly review/i.test(txt))  return 'weekly';
-  if (/monthly review/i.test(txt)) return 'monthly';
-  if (/goals/i.test(txt))          return 'goals';
+function detectType(reply) {
+  // Check the entry content (not the reply preamble) to avoid misfiling
+  const entry = extractEntry(reply) || reply;
+  const top   = entry.slice(0, 300);
+  if (/psychiatrist/i.test(top))                                return 'psychiatrist';
+  if (/rheumatologist/i.test(top))                              return 'rheumatologist';
+  if (/# Weekly/i.test(entry)  || /weekly review/i.test(top))  return 'weekly';
+  if (/# Monthly/i.test(entry) || /monthly review/i.test(top)) return 'monthly';
+  if (/goals/i.test(top))                                       return 'goals';
   return 'daily';
 }
 
 // ── GitHub save ───────────────────────────────────────────────────────────────
-async function getSHA(path) {
+async function getFileInfo(path) {
   const r = await fetch(
     `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
     { headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json' } }
   );
-  if (r.status === 404) return null;
+  if (r.status === 404) return { sha: null, content: null };
   if (r.status === 401) throw new Error('github_401');
   if (r.status === 403) throw new Error('github_403');
-  if (!r.ok) throw new Error(`SHA check failed ${r.status}`);
-  return (await r.json()).sha;
+  if (!r.ok) throw new Error(`GitHub check failed ${r.status}`);
+  const data = await r.json();
+  return { sha: data.sha, content: b64Decode(data.content.replace(/\n/g, '')) };
 }
 
 function setSaveSt(type, txt) {
@@ -432,8 +437,23 @@ async function saveEntry() {
   btn.disabled = true;
   setSaveSt('info', 'writing…');
   try {
-    const sha  = await getSHA(S.pendingPath);
-    const enc  = b64Encode(S.pendingEntry);
+    const { sha, content: existingContent } = await getFileInfo(S.pendingPath);
+
+    // For daily entries: if the file has a Garmin health block, preserve it above the journal content
+    let contentToSave = S.pendingEntry;
+    if (S.pendingPath.startsWith('journal/daily/')) {
+      if (existingContent) {
+        const parts = existingContent.split('\n## Journal');
+        if (parts.length >= 1 && parts[0].trim().startsWith('## Health')) {
+          contentToSave = parts[0].trim() + '\n\n## Journal\n\n' + S.pendingEntry;
+        }
+      } else {
+        // No Garmin file — prepend a minimal date header so the file isn't undated
+        contentToSave = `## Journal · ${S.sessionDate}\n\n` + S.pendingEntry;
+      }
+    }
+
+    const enc  = b64Encode(contentToSave);
     const body = {
       message: `journal: ${S.pendingPath.split('/').pop().replace('.md', '')}`,
       content: enc,
@@ -500,7 +520,7 @@ async function callClaude(messages, retrying = false) {
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model:      'claude-sonnet-4-5',
+        model:      'claude-sonnet-4-6',
         max_tokens: 2500,
         system:     buildSysPrompt(),
         messages,
@@ -578,7 +598,7 @@ function newSess() {
 }
 
 function _clearAndStart() {
-  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.brief = false; S.existingEntry = null;
+  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.brief = false; S.existingEntry = null; S.garminData = null;
   document.getElementById('brief-btn').classList.remove('on');
   document.getElementById('chat').innerHTML = '';
   document.getElementById('save-bar').classList.remove('show');
@@ -622,9 +642,18 @@ async function startSess() {
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
-  // Silently check if today already has an entry
+  // Silently fetch today's file — extract health block for system prompt, full content for continuation
   const existing = await fetchTodayEntry();
   S.existingEntry = existing;
+
+  // Extract Garmin health block (everything before \n## Journal)
+  if (existing) {
+    const parts = existing.split('\n## Journal');
+    const candidate = parts[0].trim();
+    S.garminData = candidate.startsWith('## Health') ? candidate : null;
+  } else {
+    S.garminData = null;
+  }
 
   const openingContent = existing
     ? `Start the journal session. It is ${timeHint} in Manila. Today already has an entry — load it as context and treat this as a continuation of the same day. When producing the final entry, merge and combine both sessions into one cohesive document — preserve the earlier narrative, append new material, and update graymatter to reflect the full day.
