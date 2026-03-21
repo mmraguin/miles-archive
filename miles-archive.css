@@ -209,6 +209,45 @@ html, body {
   50%     { opacity:0.9; transform:translateY(-4px); }
 }
 
+/* ── State bar ── */
+#state-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#state-bar.show { display: flex; }
+
+#state-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#state-lbl { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--teal); flex-shrink: 0; }
+#state-path { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#state-row  { display: flex; align-items: center; gap: 14px; }
+
+#state-go {
+  background: none; border: 1px solid var(--teal); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  transition: opacity 0.18s; line-height: 1;
+}
+#state-go:hover    { opacity: 0.82; }
+#state-go:disabled { opacity: 0.2; cursor: not-allowed; }
+
+#state-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: color 0.18s;
+}
+#state-no:hover { color: var(--text-2); }
+
+#state-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#state-st.show { display: block; }
+#state-st.ok   { color: var(--success); }
+#state-st.err  { color: var(--error); }
+#state-st.info { color: var(--text-2); }
+
 /* ── Save bar ── */
 #save-bar {
   display: none; flex-direction: column; gap: 10px;

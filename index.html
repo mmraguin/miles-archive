@@ -30,6 +30,18 @@
   <div class="rule"></div>
   <div id="chat"></div>
 
+  <div id="state-bar">
+    <div id="state-top">
+      <span id="state-lbl">State doc update</span>
+      <span id="state-path">notes/state-of-miles.md</span>
+    </div>
+    <div id="state-row">
+      <button id="state-go" onclick="saveState()">Save to GitHub →</button>
+      <button id="state-no" onclick="dismissState()">discard</button>
+      <span id="state-st"></span>
+    </div>
+  </div>
+
   <div id="save-bar">
     <div id="save-top">
       <span id="save-lbl">Entry ready</span>

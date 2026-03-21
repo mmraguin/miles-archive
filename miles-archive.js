@@ -20,6 +20,9 @@ const S = {
   pendingPath:   null,
   existingEntry: null,  // today's full file content from GitHub, if any
   garminData:    null,  // health block extracted from today's file, injected into system prompt
+  recentEntries: [],    // [{date, content}] last 3 daily entries
+  stateOfMiles:  null,  // fetched from notes/state-of-miles.md
+  pendingState:  null,  // state doc update pending save
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -109,22 +112,22 @@ function buildSysPrompt() {
     ? `TODAY'S HEALTH DATA (Garmin sync — use as live context; it will be prepended to the saved file automatically)\n${S.garminData}`
     : '';
 
-  // ── Section: Health
-  const health = `HEALTH CONTEXT (carry always)
-- IgA vasculitis (active) — ESR 76 Jan 2026, rising linearly 2+ years, not well-controlled
-- MDD, anxiety, panic disorder, agoraphobia
-- Recurrent syncope, last episode Nov 2025
-- Chronic normocytic anemia; Vitamin D deficiency (persistent despite 5000 IU)
-- 14 nights avg SpO2 below 90% — no sleep study yet
-- LDL 3.97 (Jan 2025), not rechecked; iron studies absent from record`;
+  // ── Section: State of Miles (fetched from notes/state-of-miles.md)
+  const stateDoc = S.stateOfMiles
+    ? `STATE OF MILES\n${S.stateOfMiles}\n${d === 6 ? '\nSATURDAY: confirm Methotrexate taken naturally mid-conversation.' : ''}${d === 0 ? '\nSUNDAY: confirm Folic acid taken naturally mid-conversation.' : ''}`
+    : `${d === 6 ? 'SATURDAY: confirm Methotrexate taken naturally mid-conversation.' : ''}${d === 0 ? 'SUNDAY: confirm Folic acid taken naturally mid-conversation.' : ''}`.trim() || '';
 
-  // ── Section: Medications
-  const meds = `MEDICATIONS
-- Azathioprine 50mg BD, Colchicine 0.5mg BD
-- Methotrexate 7.5mg weekly (Saturdays), Folic acid 5mg weekly (Sundays)
-- Sertraline 50mg daily, Hydroxyzine 25mg PRN
-- Omega-3, Vitamin D 5000 IU
-${d === 6 ? '→ SATURDAY: confirm Methotrexate taken naturally mid-conversation.\n' : ''}${d === 0 ? '→ SUNDAY: confirm Folic acid taken naturally mid-conversation.\n' : ''}`;
+  // ── Section: Recent entries (last 3 days, journal content only)
+  const recentContext = S.recentEntries.length
+    ? 'RECENT ENTRIES\n' + S.recentEntries.map(e => {
+        const journalIdx = e.content.indexOf('\n## Journal');
+        const content = journalIdx !== -1 ? e.content.slice(journalIdx + 1).trim() : e.content.trim();
+        return `--- ${e.date} ---\n${content}`;
+      }).join('\n\n')
+    : '';
+
+  // ── Section: Graymatter trend (parsed from recent entries)
+  const graymatterTrend = buildGraymatterTrend(S.recentEntries);
 
   // ── Section: Coaching posture
   const coaching = `COACHING POSTURE
@@ -251,11 +254,30 @@ Avoid:
 
 Write short when the moment calls for it. Ask one question, not three. If something needs to be said plainly, say it plainly. Don't soften clinical observations — name them.`;
 
+  // ── Section: State doc update instructions
+  const stateUpdate = `STATE DOC UPDATES
+When something clinically significant comes up in conversation — a medication change, new lab result, diagnosis update, a new open thread, or something that closes — you can generate an updated state-of-miles.md and offer to save it.
+
+Trigger on: medication changes, new or updated lab values, new symptoms or diagnoses, when Miles explicitly asks to update the state doc, when an open thread closes or a new one opens.
+Do not trigger: every session, for ordinary daily complaints, for things already in the current doc.
+
+When triggering, output the full updated document (replace, not append) wrapped in markers immediately after your conversational response:
+
+<<<STATE_START>>>
+# State of Miles
+
+*Last updated: ${date}*
+
+[full updated document content]
+<<<STATE_END>>>
+
+The markers will be stripped from the chat display — Miles will see a save bar for the state doc, separate from the journal entry save.`;
+
   // ── Section: Language + notability
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, garminToday, health, meds, coaching, briefMode, graymatter, protocol, output, voice, misc]
+  return [identity, context, garminToday, stateDoc, recentContext, graymatterTrend, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -415,10 +437,17 @@ function toggleBrief() {
   addSys(S.brief ? 'brief mode on' : 'brief mode off');
 }
 
-// ── Entry extraction ──────────────────────────────────────────────────────────
+// ── Entry + state extraction ──────────────────────────────────────────────────
 function extractEntry(txt) {
   const s = txt.indexOf('<<<ENTRY_START>>>');
   const e = txt.indexOf('<<<ENTRY_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 17, e).trim();
+}
+
+function extractState(txt) {
+  const s = txt.indexOf('<<<STATE_START>>>');
+  const e = txt.indexOf('<<<STATE_END>>>');
   if (s === -1 || e === -1) return null;
   return txt.slice(s + 17, e).trim();
 }
@@ -522,6 +551,70 @@ function dismissSave() {
   document.getElementById('save-st').className = '';
 }
 
+// ── State doc save ────────────────────────────────────────────────────────────
+function setStateSt(type, txt) {
+  const e = document.getElementById('state-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showStateBar(content) {
+  S.pendingState = content;
+  document.getElementById('state-go').disabled = false;
+  document.getElementById('state-st').className = '';
+  document.getElementById('state-bar').classList.add('show');
+}
+
+function dismissState() {
+  S.pendingState = null;
+  document.getElementById('state-bar').classList.remove('show');
+  document.getElementById('state-st').className = '';
+}
+
+async function saveState() {
+  if (!S.pendingState) return;
+  const btn = document.getElementById('state-go');
+  btn.disabled = true;
+  setStateSt('info', 'writing…');
+  try {
+    const path = 'notes/state-of-miles.md';
+    const { sha } = await getFileInfo(path);
+    const body = {
+      message: 'state: update state-of-miles.md',
+      content: b64Encode(S.pendingState),
+    };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${CREDS.githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.stateOfMiles = S.pendingState; // update in-memory so current session uses new doc
+    setStateSt('ok', 'saved');
+    addSys('state doc updated → notes/state-of-miles.md');
+    S.pendingState = null;
+    setTimeout(() => {
+      document.getElementById('state-bar').classList.remove('show');
+      document.getElementById('state-st').className = '';
+    }, 2400);
+  } catch(err) {
+    setStateSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
 function showSaveBar(entry, type) {
   S.pendingEntry = entry;
   S.pendingPath  = pathFor(type, S.sessionDate);
@@ -591,12 +684,15 @@ async function sendMsg() {
     const reply = await callClaude(S.messages);
     hideDots();
     const entry = extractEntry(reply);
-    const disp  = entry
-      ? (reply.slice(0, reply.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.')
-      : reply;
-    addMsg('assistant', disp);
+    const state = extractState(reply);
+    // Strip markers from displayed text
+    let disp = reply;
+    if (entry) disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
+    if (state) disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
+    addMsg('assistant', disp || 'Done.');
     S.messages.push({ role: 'assistant', content: reply });
     saveDraft();
+    if (state) showStateBar(state);
     if (entry) showSaveBar(entry, detectType(reply));
     setStat('ready', `ready — ${S.sessionDate}`);
   } catch(err) {
@@ -621,7 +717,9 @@ function newSess() {
 }
 
 function _clearAndStart() {
-  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.brief = false; S.existingEntry = null; S.garminData = null;
+  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.pendingState = null; S.brief = false; S.existingEntry = null; S.garminData = null; S.recentEntries = []; S.stateOfMiles = null;
+  document.getElementById('state-bar').classList.remove('show');
+  document.getElementById('state-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
   document.getElementById('chat').innerHTML = '';
   document.getElementById('save-bar').classList.remove('show');
@@ -638,21 +736,86 @@ function _initSessionMeta() {
   document.getElementById('wm-date').textContent = S.sessionDate;
 }
 
-// ── Fetch today's existing entry from GitHub (silent) ────────────────────────
-async function fetchTodayEntry() {
-  const path = `journal/daily/${S.sessionDate}.md`;
+// ── Generic GitHub file fetcher (silent) ─────────────────────────────────────
+async function fetchEntry(path) {
   try {
     const r = await fetch(
       `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
       { headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json' } }
     );
-    if (r.status === 404) return null;
-    if (!r.ok) return null; // silent fail — don't block session start
+    if (!r.ok) return null;
     const data = await r.json();
     return b64Decode(data.content.replace(/\n/g, ''));
   } catch(e) {
-    return null; // network issue — silent fail
+    return null;
   }
+}
+
+function fetchTodayEntry() {
+  return fetchEntry(`journal/daily/${S.sessionDate}.md`);
+}
+
+// ── Date helper — subtract N days from a YYYY-MM-DD string ───────────────────
+function daysAgo(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - n);
+  return dt.toISOString().slice(0, 10);
+}
+
+// ── Fetch last 3 daily entries in parallel ────────────────────────────────────
+async function fetchRecentEntries() {
+  const dates = [1, 2, 3].map(n => daysAgo(S.sessionDate, n));
+  const results = await Promise.allSettled(
+    dates.map(date =>
+      fetchEntry(`journal/daily/${date}.md`).then(content => content ? { date, content } : null)
+    )
+  );
+  return results
+    .filter(r => r.status === 'fulfilled' && r.value)
+    .map(r => r.value);
+}
+
+// ── Fetch State of Miles doc ──────────────────────────────────────────────────
+function fetchStateOfMiles() {
+  return fetchEntry('notes/state-of-miles.md');
+}
+
+// ── Parse graymatter scores from entry content ────────────────────────────────
+function parseGraymatter(content) {
+  if (!content) return null;
+  const fields = [
+    'Energy', 'Pain\\/Inflammation', 'Sleep Quality', 'Diet Adherence', 'Hydration',
+    'Mood', 'Anxiety', 'Motivation', 'Social Connection', 'Cognitive Clarity',
+  ];
+  const scores = {};
+  fields.forEach(field => {
+    const m = content.match(new RegExp(`${field}:\\s*(\\d)\\/5`));
+    if (m) scores[field.replace('\\/', '/')] = parseInt(m[1]);
+  });
+  return Object.keys(scores).length ? scores : null;
+}
+
+// ── Build graymatter trend string for system prompt ───────────────────────────
+function buildGraymatterTrend(entries) {
+  const rows = entries
+    .map(e => ({ date: e.date, scores: parseGraymatter(e.content) }))
+    .filter(e => e.scores);
+  if (!rows.length) return '';
+  const lines = rows.map(({ date, scores }) =>
+    `${date}: ` + Object.entries(scores).map(([k, v]) => `${k} ${v}/5`).join(' · ')
+  );
+  return `RECENT GRAYMATTER (last ${rows.length} days)\n${lines.join('\n')}`;
+}
+
+// ── Load session context (recent entries + state doc) — used at start + on draft restore ──
+async function loadSessionContext() {
+  const [recentEntries, stateOfMiles] = await Promise.all([
+    fetchRecentEntries(),
+    fetchStateOfMiles(),
+  ]);
+  S.recentEntries = recentEntries;
+  S.stateOfMiles  = stateOfMiles;
 }
 
 // ── Start session ─────────────────────────────────────────────────────────────
@@ -665,9 +828,15 @@ async function startSess() {
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
-  // Silently fetch today's file — extract health block for system prompt, full content for continuation
-  const existing = await fetchTodayEntry();
+  // Fetch today's entry + last 3 days + state doc in parallel
+  const [existing, recentEntries, stateOfMiles] = await Promise.all([
+    fetchTodayEntry(),
+    fetchRecentEntries(),
+    fetchStateOfMiles(),
+  ]);
   S.existingEntry = existing;
+  S.recentEntries = recentEntries;
+  S.stateOfMiles  = stateOfMiles;
 
   // Extract Garmin health block (everything before \n## Journal)
   if (existing) {
@@ -746,6 +915,9 @@ function restoreDraft(draft) {
   });
 
   setStat('ready', `draft — ${S.sessionDate}`);
+
+  // Background-load context so system prompt is populated when next message fires
+  loadSessionContext();
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
