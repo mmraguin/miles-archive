@@ -19,7 +19,6 @@ const S = {
   pendingEntry:  null,
   pendingPath:   null,
   existingEntry: null,  // today's full file content from GitHub, if any
-  garminData:    null,  // health block extracted from today's file, injected into system prompt
   recentEntries: [],    // [{date, content}] last 3 daily entries
   stateOfMiles:  null,  // fetched from notes/state-of-miles.md
   pendingState:  null,  // state doc update pending save
@@ -107,11 +106,6 @@ function buildSysPrompt() {
   // ── Section: Context
   const context = `TODAY: ${dow}, ${date} (GMT+8, Manila).`;
 
-  // ── Section: Today's Garmin data (injected from sync file if available)
-  const garminToday = S.garminData
-    ? `TODAY'S HEALTH DATA (Garmin sync — use as live context; it will be prepended to the saved file automatically)\n${S.garminData}`
-    : '';
-
   // ── Section: State of Miles (fetched from notes/state-of-miles.md)
   const stateDoc = S.stateOfMiles
     ? `STATE OF MILES\n${S.stateOfMiles}\n${d === 6 ? '\nSATURDAY: confirm Methotrexate taken naturally mid-conversation.' : ''}${d === 0 ? '\nSUNDAY: confirm Folic acid taken naturally mid-conversation.' : ''}`
@@ -158,15 +152,16 @@ Flags (only if mentioned): Panic attack, Near-syncope, Skin changes/purpura, GI 
 
   // ── Section: Daily protocol
   const protocol = `DAILY JOURNAL PROTOCOL
-1. OPEN: Use one of the session openers below. Fresh session only — do not re-open if context already exists.
+1. OPEN: Ask Miles to share her bevel.ai health summary — one natural line before anything else. e.g. "Share your bevel data when you're ready." or "Drop your bevel summary and we'll go from there." Fresh session only — skip if an existing entry already has a Health section.
    If an existing entry was loaded, acknowledge the continuation naturally — e.g. "Welcome back. What else happened?" or "How did the rest of the day go?" — don't re-ask what was already covered.
-2. Let Miles give the overview freely. Do not rush.
-3. Reporter mode: one follow-up at a time. Follow threads — do not interrogate.
-4. Apply coaching posture as the session develops. Observations and pushback are welcome when earned.
-5. Transition to numbers when the narrative feels complete: "Okay — let's do the numbers."
+2. Once health data is pasted, acknowledge it briefly, then use one of the session openers below to open the journal conversation.
+3. Let Miles give the overview freely. Do not rush.
+4. Reporter mode: one follow-up at a time. Follow threads — do not interrogate.
+5. Apply coaching posture as the session develops. Observations and pushback are welcome when earned.
+6. Transition to numbers when the narrative feels complete: "Okay — let's do the numbers."
    If graymatter was already collected in the existing entry, confirm or update scores rather than re-collecting from scratch.
-6. Collect all graymatter fields. Weave context from the full day into the narrative.
-7. When everything is collected, produce the merged entry.
+7. Collect all graymatter fields. Weave context from the full day into the narrative.
+8. When everything is collected, produce the complete entry.
 
 SAME-DAY CONTINUATION (when existing entry is loaded):
 - Do not repeat questions already answered in the existing entry.
@@ -176,7 +171,7 @@ SAME-DAY CONTINUATION (when existing entry is loaded):
 - Flags: carry forward any flags from the earlier entry plus any new ones.
 - Notes: append new Notability content to existing notes.
 
-SESSION OPENERS (rotate — use one, vary across sessions, read the hour and energy):
+SESSION OPENERS (rotate — use one after health data is received, vary across sessions, read the hour and energy):
 - "Ready when you are."
 - "Walk me through it."
 - "What's the day been?"
@@ -196,9 +191,33 @@ When Miles asks for a weekly or monthly review:
 
   // ── Section: Output format
   const output = `OUTPUT FORMAT
-When the interview is complete, output the entry wrapped in markers. Everything between the markers is saved to GitHub — make it clean.
+When the interview is complete, output the entry wrapped in markers. Everything between the markers is saved to GitHub as the complete file — make it clean.
 
 <<<ENTRY_START>>>
+---
+date: ${S.sessionDate}
+health:
+  [key-value pairs parsed from bevel.ai data — whatever fields she provides]
+graymatter:
+  energy: X
+  pain: X
+  sleep_quality: X
+  diet: X
+  hydration: X
+  mood: X
+  anxiety: X
+  motivation: X
+  social: X
+  clarity: X
+  medications: true/false
+  alcohol: true/false
+  wind_down: true/false
+flags: []
+---
+
+## Health
+[Formatted health content from bevel.ai — readable prose or structured list.]
+
 ## Narrative
 [First person. Specific and honest. Written from what Miles shared, not generic filler.]
 
@@ -228,6 +247,8 @@ When the interview is complete, output the entry wrapped in markers. Everything 
 ## Notes
 [Notability content or stray thoughts. Omit if none.]
 <<<ENTRY_END>>>
+
+Notes on the format: YAML and markdown sections are both present — YAML for machine retrieval, markdown for human reading. No date in section headers. For same-day continuation: produce one merged entry covering the full day; it will overwrite the existing file.
 
 For weekly/monthly reviews and clinical summaries: use appropriate format, same markers, state type clearly at the top.`;
 
@@ -277,7 +298,7 @@ The markers will be stripped from the chat display — Miles will see a save bar
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, garminToday, stateDoc, recentContext, graymatterTrend, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, misc]
+  return [identity, context, stateDoc, recentContext, graymatterTrend, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -489,21 +510,10 @@ async function saveEntry() {
   btn.disabled = true;
   setSaveSt('info', 'writing…');
   try {
-    const { sha, content: existingContent } = await getFileInfo(S.pendingPath);
+    const { sha } = await getFileInfo(S.pendingPath);
 
-    // For daily entries: if the file has a Garmin health block, preserve it above the journal content
-    let contentToSave = S.pendingEntry;
-    if (S.pendingPath.startsWith('journal/daily/')) {
-      if (existingContent) {
-        const parts = existingContent.split('\n## Journal');
-        if (parts.length >= 1 && parts[0].trim().startsWith('## Health')) {
-          contentToSave = parts[0].trim() + '\n\n## Journal\n\n' + S.pendingEntry;
-        }
-      } else {
-        // No Garmin file — prepend a minimal date header so the file isn't undated
-        contentToSave = `## Journal · ${S.sessionDate}\n\n` + S.pendingEntry;
-      }
-    }
+    // Claude produces the complete file (YAML frontmatter + all sections) — save wholesale
+    const contentToSave = S.pendingEntry;
 
     const enc  = b64Encode(contentToSave);
     const body = {
@@ -717,7 +727,7 @@ function newSess() {
 }
 
 function _clearAndStart() {
-  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.pendingState = null; S.brief = false; S.existingEntry = null; S.garminData = null; S.recentEntries = []; S.stateOfMiles = null;
+  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.pendingState = null; S.brief = false; S.existingEntry = null; S.recentEntries = []; S.stateOfMiles = null;
   document.getElementById('state-bar').classList.remove('show');
   document.getElementById('state-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
@@ -781,18 +791,37 @@ function fetchStateOfMiles() {
   return fetchEntry('notes/state-of-miles.md');
 }
 
-// ── Parse graymatter scores from entry content ────────────────────────────────
+// ── Parse graymatter scores from YAML frontmatter ────────────────────────────
 function parseGraymatter(content) {
-  if (!content) return null;
-  const fields = [
-    'Energy', 'Pain\\/Inflammation', 'Sleep Quality', 'Diet Adherence', 'Hydration',
-    'Mood', 'Anxiety', 'Motivation', 'Social Connection', 'Cognitive Clarity',
-  ];
+  if (!content || !content.startsWith('---')) return null;
+  const end = content.indexOf('\n---', 3);
+  if (end === -1) return null;
+  const yaml = content.slice(3, end);
+
+  const gmIdx = yaml.indexOf('graymatter:');
+  if (gmIdx === -1) return null;
+  const gmSection = yaml.slice(gmIdx + 11);
+
+  const labelMap = {
+    energy:        'Energy',
+    pain:          'Pain/Inflammation',
+    sleep_quality: 'Sleep Quality',
+    diet:          'Diet Adherence',
+    hydration:     'Hydration',
+    mood:          'Mood',
+    anxiety:       'Anxiety',
+    motivation:    'Motivation',
+    social:        'Social Connection',
+    clarity:       'Cognitive Clarity',
+  };
+
   const scores = {};
-  fields.forEach(field => {
-    const m = content.match(new RegExp(`${field}:\\s*(\\d)\\/5`));
-    if (m) scores[field.replace('\\/', '/')] = parseInt(m[1]);
-  });
+  for (const line of gmSection.split('\n')) {
+    const m = line.match(/^\s{2}(\w+):\s*(\d)/);
+    if (!m) continue;
+    const label = labelMap[m[1]];
+    if (label) scores[label] = parseInt(m[2]);
+  }
   return Object.keys(scores).length ? scores : null;
 }
 
@@ -837,15 +866,6 @@ async function startSess() {
   S.existingEntry = existing;
   S.recentEntries = recentEntries;
   S.stateOfMiles  = stateOfMiles;
-
-  // Extract Garmin health block (everything before \n## Journal)
-  if (existing) {
-    const parts = existing.split('\n## Journal');
-    const candidate = parts[0].trim();
-    S.garminData = candidate.startsWith('## Health') ? candidate : null;
-  } else {
-    S.garminData = null;
-  }
 
   const openingContent = existing
     ? `Start the journal session. It is ${timeHint} in Manila. Today already has an entry — load it as context and treat this as a continuation of the same day. When producing the final entry, merge and combine both sessions into one cohesive document — preserve the earlier narrative, append new material, and update graymatter to reflect the full day.
