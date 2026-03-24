@@ -62,13 +62,13 @@ function isoWeek(dateStr) {
 
 function pathFor(type, date) {
   return {
-    daily:          `journal/daily/${date}.md`,
+    daily:          `journal/daily/${date.slice(0,4)}/${date}.md`,
     weekly:         `journal/weekly/${isoWeek(date)}.md`,
     monthly:        `journal/monthly/${date.slice(0,7)}.md`,
     psychiatrist:   `summaries/psychiatrist/${date}.md`,
     rheumatologist: `summaries/rheumatologist/${date}.md`,
     goals:          `goals/current.md`,
-  }[type] || `journal/daily/${date}.md`;
+  }[type] || `journal/daily/${date.slice(0,4)}/${date}.md`;
 }
 
 // ── Base64 helpers (no deprecated escape/unescape) ────────────────────────────
@@ -762,7 +762,7 @@ async function fetchEntry(path) {
 }
 
 function fetchTodayEntry() {
-  return fetchEntry(`journal/daily/${S.sessionDate}.md`);
+  return fetchEntry(`journal/daily/${S.sessionDate.slice(0,4)}/${S.sessionDate}.md`);
 }
 
 // ── Date helper — subtract N days from a YYYY-MM-DD string ───────────────────
@@ -778,7 +778,7 @@ async function fetchRecentEntries() {
   const dates = [1, 2, 3].map(n => daysAgo(S.sessionDate, n));
   const results = await Promise.allSettled(
     dates.map(date =>
-      fetchEntry(`journal/daily/${date}.md`).then(content => content ? { date, content } : null)
+      fetchEntry(`journal/daily/${date.slice(0,4)}/${date}.md`).then(content => content ? { date, content } : null)
     )
   );
   return results
