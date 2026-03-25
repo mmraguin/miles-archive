@@ -10,18 +10,23 @@ function credsReady() {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const S = {
-  messages:      [],
-  sessionDate:   null,
-  sessionDow:    null,
-  sessionDay:    null,
-  brief:         false,
-  thinking:      false,
-  pendingEntry:  null,
-  pendingPath:   null,
-  existingEntry: null,  // today's full file content from GitHub, if any
-  recentEntries: [],    // [{date, content}] last 3 daily entries
-  stateOfMiles:  null,  // fetched from notes/state-of-miles.md
-  pendingState:  null,  // state doc update pending save
+  messages:         [],
+  sessionDate:      null,
+  sessionDow:       null,
+  sessionDay:       null,
+  brief:            false,
+  thinking:         false,
+  pendingEntry:     null,
+  pendingPath:      null,
+  existingEntry:    null,  // today's full file content from GitHub, if any
+  recentEntries:    [],    // [{date, content}] last 3 daily entries, compressed
+  stateOfMiles:     null,  // fetched from notes/state-of-miles.md
+  pendingState:     null,  // state doc update pending save
+  goals:            null,  // fetched from notes/goals-summary.md
+  patterns:         null,  // fetched from notes/patterns.md
+  pendingPatterns:  null,  // patterns doc update pending save
+  deepFetched:      false, // whether deep context fetch has fired this session
+  _queuedPatterns:  null,  // patterns update queued to show after entry bar clears
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -101,7 +106,7 @@ function buildSysPrompt() {
   const { sessionDate: date, sessionDow: dow, sessionDay: d } = S;
 
   // ── Section: Identity
-  const identity = `You are Miles's personal intelligence system — journal interviewer, pattern tracker, honest observer. You conduct daily journal interviews, notice what matters, and produce structured markdown entries.`;
+  const identity = `You are Miles's personal intelligence system — always running, always watching. Every session you do three things at once: run the daily journal conversation, build a picture across time, and surface what Miles might not be noticing herself. Not a chatbot. Someone who actually knows her.`;
 
   // ── Section: Context
   const context = `TODAY: ${dow}, ${date} (GMT+8, Manila).`;
@@ -111,13 +116,19 @@ function buildSysPrompt() {
     ? `STATE OF MILES\n${S.stateOfMiles}\n${d === 6 ? '\nSATURDAY: confirm Methotrexate taken naturally mid-conversation.' : ''}${d === 0 ? '\nSUNDAY: confirm Folic acid taken naturally mid-conversation.' : ''}`
     : `${d === 6 ? 'SATURDAY: confirm Methotrexate taken naturally mid-conversation.' : ''}${d === 0 ? 'SUNDAY: confirm Folic acid taken naturally mid-conversation.' : ''}`.trim() || '';
 
-  // ── Section: Recent entries (last 3 days, journal content only)
+  // ── Section: Active goals (fetched from notes/goals-summary.md)
+  const goalsContext = S.goals
+    ? `ACTIVE GOALS\n${S.goals}\n\nReference these as live context — not a checklist. When something Miles says maps to a goal or contradicts one, mention it naturally. When a goal hasn't come up in a while, notice that. On hard days, during health flares, or when emotional presence is needed first — hold this layer entirely. Don't surface goal alignment when she's struggling.`
+    : '';
+
+  // ── Section: Accumulated patterns (fetched from notes/patterns.md — active section only)
+  const patternsContext = S.patterns
+    ? `ACCUMULATED PATTERNS\n${S.patterns}\n\nThis is your working memory across sessions. Use it — don't reference the doc explicitly, just use what you know. When today confirms or breaks a pattern, that's signal. At session end, after the entry, you can update this doc if something notable emerged — see PATTERNS DOC UPDATES below.`
+    : '';
+
+  // ── Section: Recent entries (last 3 days, compressed: YAML + first Narrative paragraph)
   const recentContext = S.recentEntries.length
-    ? 'RECENT ENTRIES\n' + S.recentEntries.map(e => {
-        const journalIdx = e.content.indexOf('\n## Journal');
-        const content = journalIdx !== -1 ? e.content.slice(journalIdx + 1).trim() : e.content.trim();
-        return `--- ${e.date} ---\n${content}`;
-      }).join('\n\n')
+    ? 'RECENT ENTRIES\n' + S.recentEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n')
     : '';
 
   // ── Section: Graymatter trend (parsed from recent entries)
@@ -125,18 +136,37 @@ function buildSysPrompt() {
 
   // ── Section: Trend awareness
   const trendAwareness = (S.recentEntries.length || S.stateOfMiles) ? `TREND AWARENESS
-You have recent graymatter scores and full entry content including Health sections. Use them actively — don't wait for Miles to ask.
+You have recent scores, entry narratives, goals, and accumulated patterns. Use them — don't wait to be asked.
 
 Spot and surface:
-- Any metric declining across sessions (e.g., sleep 3→2→2, energy 4→3→2) — name the direction
-- Any metric consistently low across all recent entries — worth flagging even if she doesn't mention it
-- Recurring flags (near-syncope, GI symptoms, skin changes) across multiple days — treat as a pattern, not an incident
-- Health data patterns: resting HR trending up, HRV dropping, sleep stages skewed — if it shows up across entries, surface it
-- A score that diverges from how she describes her day — if she says she felt okay but pain was 4/5 for three days, name it
+- Metrics declining across sessions (e.g., sleep 3→2→2, energy 4→3→2) — name the direction, be specific
+- Any metric consistently low across all recent entries — flag even if not mentioned
+- Recurring health flags across multiple days — pattern, not incident
+- Narrative vs. number divergence — if she says fine but pain is 4/5 three days running, name it
+- Goal connections — if something she mentions today maps to a goal or contradicts one
+- Pattern confirmation or break — if today looks like a known pattern, or breaks one
 
-When to surface: early in session if something is clearly notable, or naturally when the relevant topic comes up. Don't turn every session into a trend report — pick the one or two things that actually matter this week.
+When to surface: early in session if clearly notable, or naturally when the topic comes up. One or two things that actually matter — not a full report every session.
 
-Be specific. "Your sleep quality has been 2/5 for three days" lands differently than "sleep has been rough lately."` : '';
+Sound like a friend who noticed something, not an analyst reading a report. "Your energy's been pretty low every day you drink" not "alcohol:true days correlate with reduced next-day energy scores." Specific, conversational, no data-voice.
+
+PRIORITY: When Miles is struggling, emotional presence runs first. Health observations second. Goal and pattern intelligence third — it's always on but surfaces only what serves her right now.` : '';
+
+  // ── Section: Deep context fetch
+  const fetchDeep = `DEEP CONTEXT FETCH
+Emit <<<FETCH_DEEP>>> once per session if deeper retrospective would genuinely help.
+
+Fetch when:
+- Miles is processing something emotional or psychological that clearly has history beyond the last few days
+- Something came up that connects to an older thread — a person, situation, or feeling you've seen before but not in recent entries
+- The conversation is moving toward self-understanding, not just logging
+
+Never fetch when:
+- It's a routine log session
+- Brief mode is active
+- Miles has signaled she wants to keep it short
+
+Emit the marker once in your response. It will be stripped from display and entries fetched silently.`;
 
   // ── Section: Coaching posture
   const coaching = `COACHING POSTURE
@@ -273,28 +303,32 @@ For weekly/monthly reviews and clinical summaries: use appropriate format, same 
 
   // ── Section: Voice and format
   const voice = `VOICE & FORMAT
-In conversation (not the saved entry), write like a person. No markdown. No asterisks, no bold, no headers, no bullet points. Plain prose only — the UI renders textContent, not HTML, so formatting shows as raw characters anyway.
+In conversation (not the saved entry), write like a person. No markdown. No asterisks, bold, headers, or bullet points. Plain prose only — the UI renders textContent, not HTML.
 
-Sound like a sharp, direct friend who also happens to know medicine and how to ask the right questions. Not an AI pretending to be warm. Not a therapist reading from a script. Someone who actually knows Miles, tracks what's been said before, and doesn't need to perform care.
+Sound like a sharp, direct friend who knows medicine and how to ask the right questions. Not an AI performing warmth. Not a therapist reading from a script. Someone who actually knows Miles, tracks what's been said, and doesn't need to perform care.
+
+HOW TO RESPOND
+Match the register of the message. Three words in, three words back is fine. Don't expand a short message into a paragraph.
+Pick the most important thing in what she said and respond to that. Don't address every clause.
+Don't always end with a question. Sometimes a statement is the right place to land. One question maximum — never a list.
+When you notice something — a pattern, a goal connection, a divergence — say it as a statement in the flow. Not "I notice that..." Just say it. "That's three weeks in a row." "That's the opposite of what you said you wanted in February."
+Reference specific things. Not "your recent entries show resilience" but "you said last Tuesday you were dreading this — sounds like it went differently."
+Don't narrate what you're about to do. Don't summarize the session at the end. Don't validate before disagreeing — just disagree.
 
 Avoid:
 - Overworked adverbs: "quietly", "deeply", "fundamentally", "remarkably"
 - AI vocabulary: "delve", "certainly", "leverage", "robust", "streamline", "harness", "tapestry", "landscape", "paradigm"
 - Copula dodges: "serves as", "stands as", "marks", "represents" — just say "is"
 - Negative parallelism: "It's not X. It's Y." — use it once if you need it, not as a reflex
-- Fake suspense: "Here's the thing", "Here's the kicker", "Here's where it gets interesting"
+- Fake suspense: "Here's the thing", "Here's the kicker"
 - Rhetorical questions you immediately answer: "The result? Devastating."
 - Patronizing analogies: "Think of it as...", "It's like a..."
-- Grandiose stakes: "This will fundamentally reshape how we think about everything"
 - Bullet-point thinking dressed as sentences: "The first... The second... The third..."
-- Signposted conclusions: "In conclusion", "To sum up", "In summary"
-- False vulnerability: performative self-awareness that sounds polished and risk-free
+- Signposted conclusions: "In conclusion", "To sum up"
 - Tricolon pileups — one rule of three is fine, three in a row is a tell
-- Em-dash addiction — use sparingly, not for every pivot
+- Em-dash addiction — use sparingly
 
-Write short when the moment calls for it. Ask one question, not three. If something needs to be said plainly, say it plainly. Don't soften clinical observations — name them.
-
-Emojis are fine when they fit. Use them occasionally — when they add something or land a point better than words. Not as filler, not after every sentence.`;
+Write short when the moment calls for it. Don't soften clinical observations — name them. Emojis occasionally when they land something better than words — not as filler.`;
 
   // ── Section: State doc update instructions
   const stateUpdate = `STATE DOC UPDATES
@@ -315,11 +349,49 @@ When triggering, output the full updated document (replace, not append) wrapped 
 
 The markers will be stripped from the chat display — Miles will see a save bar for the state doc, separate from the journal entry save.`;
 
+  // ── Section: Patterns doc update instructions
+  const patternsUpdate = `PATTERNS DOC UPDATES
+After producing the journal entry, if something notable emerged this session, update notes/patterns.md. Output the complete updated doc wrapped in markers:
+
+<<<PATTERNS_START>>>
+# Miles Patterns
+
+*Last updated: ${date}*
+
+## Health Correlations
+[observation — confirmed Nx — First: YYYY-MM-DD — Last: YYYY-MM-DD]
+
+## Behavioral Patterns
+[observation — confirmed Nx — Last: YYYY-MM-DD — direction: improving/stable/worsening]
+
+## Emotional Patterns
+[observation — confirmed across N sessions — Last: YYYY-MM-DD]
+
+## Goal Alignment
+[goal name: status note — last noted: YYYY-MM-DD]
+
+## Wins & Milestones
+[YYYY-MM-DD: description]
+
+## Open Threads
+[topic — first raised: YYYY-MM-DD — status: open/resolved YYYY-MM-DD]
+
+## Declined
+[observation — declined: YYYY-MM-DD — do not repropose until YYYY-MM-DD]
+<<<PATTERNS_END>>>
+
+UPDATE when: a correlation confirmed 3+ times across different days, a behavioral pattern confirmed 4+ times, an emotional pattern across 3+ session narratives, a win worth recording, an open thread opened or closed, a goal stagnant 4+ weeks or actively moving.
+DO NOT update: every session, for single incidents, for things already accurately captured.
+
+When updating, also clean the doc: mark resolved patterns as resolved, remove Declined entries older than 4 weeks, flag health correlations that predate a recent state doc change as "needs review — health context changed [date]." If a pattern's last confirmed date is 8+ weeks ago and hasn't recurred, mark it "needs review — stale."
+
+Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
+
   // ── Section: Language + notability
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, recentContext, graymatterTrend, trendAwareness, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -494,6 +566,13 @@ function extractState(txt) {
   return txt.slice(s + 17, e).trim();
 }
 
+function extractPatterns(txt) {
+  const s = txt.indexOf('<<<PATTERNS_START>>>');
+  const e = txt.indexOf('<<<PATTERNS_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 20, e).trim();
+}
+
 function detectType(reply) {
   // Check the entry content (not the reply preamble) to avoid misfiling
   const entry = extractEntry(reply) || reply;
@@ -569,6 +648,11 @@ async function saveEntry() {
     setTimeout(() => {
       document.getElementById('save-bar').classList.remove('show');
       document.getElementById('save-st').className = '';
+      if (S._queuedPatterns) {
+        const p = S._queuedPatterns;
+        S._queuedPatterns = null;
+        showPatBar(p);
+      }
     }, 2400);
   } catch(err) {
     setSaveSt('err', friendlyError(err));
@@ -580,6 +664,11 @@ function dismissSave() {
   S.pendingEntry = null; S.pendingPath = null;
   document.getElementById('save-bar').classList.remove('show');
   document.getElementById('save-st').className = '';
+  if (S._queuedPatterns) {
+    const p = S._queuedPatterns;
+    S._queuedPatterns = null;
+    showPatBar(p);
+  }
 }
 
 // ── State doc save ────────────────────────────────────────────────────────────
@@ -642,6 +731,70 @@ async function saveState() {
     }, 2400);
   } catch(err) {
     setStateSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── Patterns doc save ─────────────────────────────────────────────────────────
+function setPatSt(type, txt) {
+  const e = document.getElementById('pat-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showPatBar(content) {
+  S.pendingPatterns = content;
+  document.getElementById('pat-go').disabled = false;
+  document.getElementById('pat-st').className = '';
+  document.getElementById('pat-bar').classList.add('show');
+}
+
+function dismissPatterns() {
+  S.pendingPatterns = null;
+  document.getElementById('pat-bar').classList.remove('show');
+  document.getElementById('pat-st').className = '';
+}
+
+async function savePatterns() {
+  if (!S.pendingPatterns) return;
+  const btn = document.getElementById('pat-go');
+  btn.disabled = true;
+  setPatSt('info', 'writing…');
+  try {
+    const path = 'notes/patterns.md';
+    const { sha } = await getFileInfo(path);
+    const body = {
+      message: 'patterns: update notes/patterns.md',
+      content: b64Encode(S.pendingPatterns),
+    };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${CREDS.githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.patterns = S.pendingPatterns;
+    setPatSt('ok', 'saved');
+    addSys('patterns updated → notes/patterns.md');
+    S.pendingPatterns = null;
+    setTimeout(() => {
+      document.getElementById('pat-bar').classList.remove('show');
+      document.getElementById('pat-st').className = '';
+    }, 2400);
+  } catch(err) {
+    setPatSt('err', friendlyError(err));
     btn.disabled = false;
   }
 }
@@ -714,18 +867,41 @@ async function sendMsg() {
   try {
     const reply = await callClaude(S.messages);
     hideDots();
-    const entry = extractEntry(reply);
-    const state = extractState(reply);
-    // Strip markers from displayed text
+    const entry    = extractEntry(reply);
+    const state    = extractState(reply);
+    const patterns = extractPatterns(reply);
+    const deepFetch = reply.includes('<<<FETCH_DEEP>>>');
+    // Strip all markers from displayed text
     let disp = reply;
-    if (entry) disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
-    if (state) disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
+    if (entry)    disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
+    if (state)    disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
+    if (patterns) disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
+    disp = disp.replace(/<<<FETCH_DEEP>>>/g, '').trim();
     addMsg('assistant', disp || 'Done.');
     S.messages.push({ role: 'assistant', content: reply });
     saveDraft();
     if (state) showStateBar(state);
+    // Queue patterns after entry bar, or show immediately if no entry
+    if (patterns && entry) {
+      S._queuedPatterns = patterns;
+    } else if (patterns) {
+      showPatBar(patterns);
+    }
     if (entry) showSaveBar(entry, detectType(reply));
     setStat('ready', `ready — ${S.sessionDate}`);
+    // Trigger deep context fetch in background if signaled
+    if (deepFetch && !S.deepFetched) {
+      S.deepFetched = true;
+      setStat('thinking', 'pulling more context…');
+      fetchDeepEntries().then(deepEntries => {
+        if (deepEntries.length) {
+          const ctx = 'DEEPER CONTEXT\n' + deepEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n');
+          S.messages.push({ role: 'user', content: ctx });
+          addSys('deeper context loaded');
+        }
+        setStat('ready', `ready — ${S.sessionDate}`);
+      }).catch(() => setStat('ready', `ready — ${S.sessionDate}`));
+    }
   } catch(err) {
     hideDots();
     addSys(`error: ${friendlyError(err)}`);
@@ -748,7 +924,12 @@ function newSess() {
 }
 
 function _clearAndStart() {
-  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.pendingState = null; S.brief = false; S.existingEntry = null; S.recentEntries = []; S.stateOfMiles = null;
+  S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.pendingState = null;
+  S.brief = false; S.existingEntry = null; S.recentEntries = []; S.stateOfMiles = null;
+  S.goals = null; S.patterns = null; S.pendingPatterns = null;
+  S.deepFetched = false; S._queuedPatterns = null;
+  document.getElementById('pat-bar').classList.remove('show');
+  document.getElementById('pat-st').className = '';
   document.getElementById('state-bar').classList.remove('show');
   document.getElementById('state-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
@@ -784,6 +965,40 @@ async function fetchEntry(path) {
 
 function fetchTodayEntry() {
   return fetchEntry(`journal/daily/${S.sessionDate.slice(0,4)}/${S.sessionDate}.md`);
+}
+
+// ── Compress entry: YAML frontmatter + first Narrative paragraph only ─────────
+function compressEntry(content) {
+  if (!content) return '';
+  const parts = [];
+  if (content.startsWith('---')) {
+    const end = content.indexOf('\n---', 3);
+    if (end !== -1) parts.push(content.slice(0, end + 4));
+  }
+  const narrativeIdx = content.indexOf('## Narrative');
+  if (narrativeIdx !== -1) {
+    const after = content.slice(narrativeIdx + 12).trim();
+    const paraEnd = after.indexOf('\n\n');
+    const para = paraEnd !== -1 ? after.slice(0, paraEnd) : after.slice(0, 400);
+    if (para) parts.push('## Narrative\n' + para);
+  }
+  return parts.join('\n\n') || content.slice(0, 500);
+}
+
+function fetchGoals()    { return fetchEntry('notes/goals-summary.md'); }
+function fetchPatterns() { return fetchEntry('notes/patterns.md'); }
+
+// ── Fetch entries 4–14 days ago in parallel (triggered by <<<FETCH_DEEP>>>) ───
+async function fetchDeepEntries() {
+  const dates = [4,5,6,7,8,9,10,11,12,13,14].map(n => daysAgo(S.sessionDate, n));
+  const results = await Promise.allSettled(
+    dates.map(date =>
+      fetchEntry(`journal/daily/${date.slice(0,4)}/${date}.md`).then(content => content ? { date, content } : null)
+    )
+  );
+  return results
+    .filter(r => r.status === 'fulfilled' && r.value)
+    .map(r => r.value);
 }
 
 // ── Date helper — subtract N days from a YYYY-MM-DD string ───────────────────
@@ -858,14 +1073,18 @@ function buildGraymatterTrend(entries) {
   return `RECENT GRAYMATTER (last ${rows.length} days)\n${lines.join('\n')}`;
 }
 
-// ── Load session context (recent entries + state doc) — used at start + on draft restore ──
+// ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
-  const [recentEntries, stateOfMiles] = await Promise.all([
+  const [recentEntries, stateOfMiles, goals, patterns] = await Promise.all([
     fetchRecentEntries(),
     fetchStateOfMiles(),
+    fetchGoals(),
+    fetchPatterns(),
   ]);
   S.recentEntries = recentEntries;
   S.stateOfMiles  = stateOfMiles;
+  S.goals         = goals;
+  S.patterns      = patterns;
 }
 
 // ── Start session ─────────────────────────────────────────────────────────────
@@ -878,15 +1097,19 @@ async function startSess() {
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
-  // Fetch today's entry + last 3 days + state doc in parallel
-  const [existing, recentEntries, stateOfMiles] = await Promise.all([
+  // Fetch today's entry + recent days + state doc + goals + patterns in parallel
+  const [existing, recentEntries, stateOfMiles, goals, patterns] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(),
     fetchStateOfMiles(),
+    fetchGoals(),
+    fetchPatterns(),
   ]);
   S.existingEntry = existing;
   S.recentEntries = recentEntries;
   S.stateOfMiles  = stateOfMiles;
+  S.goals         = goals;
+  S.patterns      = patterns;
 
   const openingContent = existing
     ? `Start the journal session. It is ${timeHint} in Manila. Today already has an entry — load it as context and treat this as a continuation of the same day. When producing the final entry, merge and combine both sessions into one cohesive document — preserve the earlier narrative, append new material, and update graymatter to reflect the full day.

@@ -30,6 +30,18 @@
   <div class="rule"></div>
   <div id="chat"></div>
 
+  <div id="pat-bar">
+    <div id="pat-top">
+      <span id="pat-lbl">Patterns update</span>
+      <span id="pat-path">notes/patterns.md</span>
+    </div>
+    <div id="pat-row">
+      <button id="pat-go" onclick="savePatterns()">Save to GitHub →</button>
+      <button id="pat-no" onclick="dismissPatterns()">discard</button>
+      <span id="pat-st"></span>
+    </div>
+  </div>
+
   <div id="state-bar">
     <div id="state-top">
       <span id="state-lbl">State doc update</span>
@@ -114,8 +126,9 @@
     </div>
 
     <div class="sh-field">
-      <div class="sh-lbl">Repository</div>
+      <div class="sh-lbl">Data Repository</div>
       <input type="text" class="bare" id="cfg-repo" placeholder="username/repo-name">
+      <div class="sh-note">Private repo where your journal entries and notes live. Can differ from the app repo.</div>
     </div>
 
     <div class="sh-actions">
