@@ -1,14 +1,15 @@
 # miles-archive — Project Reference
 
-*Last updated: March 25, 2026. Intelligent logger update live.*
+*Last updated: March 25, 2026. Dashboard + people profile + evolution tracking live.*
 
 ---
 
 ## What This Is
 
-Personal journal and intelligence system for Miles (she/her, Manila, GMT+8). Single-page web app on GitHub Pages. Replaces Day One, Habitify, Daylio, and Apple Notes. One daily conversation with Claude that captures the day, tracks health data, and saves structured markdown to a private GitHub repo.
+Personal journal and intelligence system for Miles (she/her, Manila, GMT+8). Two-page web app on GitHub Pages. Replaces Day One, Habitify, Daylio, and Apple Notes. One daily conversation with Claude that captures the day, tracks health data, and saves structured markdown to a private GitHub repo. Separate dashboard surfaces trends, patterns, and AI observations across time.
 
-Live at: `https://mmraguin.github.io/miles-archive/`
+Chat: `https://mmraguin.github.io/miles-archive/`
+Dashboard: `https://mmraguin.github.io/miles-archive/dashboard.html`
 
 ---
 
@@ -28,6 +29,7 @@ Miles Intelligence System/
 ├── journal/                     ← daily entries uploaded via app
 ├── Git/                         ← live app files (deploy from here)
 │   ├── index.html
+│   ├── dashboard.html
 │   ├── miles-archive.css
 │   └── miles-archive.js
 ├── New notion goals/            ← processed: Outcome + Milestone CSVs (2023–2026)
@@ -59,15 +61,18 @@ Two-repo architecture: app code lives in public `mmraguin/miles-archive` (GitHub
 
 ---
 
-## Three-File App
+## Four-File App
 
-All three files live in repo root. Read all three before changing any one.
+All four files live in repo root. Read all relevant files before changing any one.
 
-| File | Role | Size |
-|---|---|---|
-| `index.html` | Markup only | ~119 lines |
-| `miles-archive.css` | All styles | ~469 lines |
-| `miles-archive.js` | All logic | ~1050 lines |
+| File | Role |
+|---|---|
+| `index.html` | Chat page markup |
+| `dashboard.html` | Dashboard page markup — shares CSS + JS, calls `initDash()` |
+| `miles-archive.css` | All styles (chat + dashboard) |
+| `miles-archive.js` | All logic (chat session + dashboard) |
+
+`init()` at the bottom of `miles-archive.js` is guarded: only runs if `#app` exists (index.html). Dashboard calls `initDash()` explicitly. Don't remove that guard.
 
 ---
 
@@ -118,23 +123,30 @@ Config access: ⚙ button top-right. Anthropic auto-revokes keys found in chat o
 
 ```javascript
 const S = {
-  messages:        [],   // full Claude conversation history
-  sessionDate:     null, // 'YYYY-MM-DD' Manila
-  sessionDow:      null, // 'Tuesday' etc
-  sessionDay:      null, // 0–6, 0=Sun
-  brief:           false,
-  thinking:        false,
-  pendingEntry:    null,
-  pendingPath:     null,
-  existingEntry:   null, // today's full file content from GitHub, if any
-  recentEntries:   [],   // [{date, content}] last 3 daily entries, compressed
-  stateOfMiles:    null, // fetched from notes/state-of-miles.md
-  pendingState:    null, // state doc update pending save
-  goals:           null, // fetched from notes/goals-summary.md
-  patterns:        null, // fetched from notes/patterns.md
-  pendingPatterns: null, // patterns doc update pending save
-  deepFetched:     false,// whether FETCH_DEEP has fired this session
-  _queuedPatterns: null, // patterns update queued to show after entry bar clears
+  messages:         [],   // full Claude conversation history
+  sessionDate:      null, // 'YYYY-MM-DD' Manila
+  sessionDow:       null, // 'Tuesday' etc
+  sessionDay:       null, // 0–6, 0=Sun
+  brief:            false,
+  thinking:         false,
+  pendingEntry:     null,
+  pendingPath:      null,
+  existingEntry:    null,  // today's full file content from GitHub, if any
+  recentEntries:    [],    // [{date, content}] last 3 daily entries, compressed
+  stateOfMiles:     null,  // fetched from notes/state-of-miles.md
+  pendingState:     null,  // state doc update pending save
+  goals:            null,  // fetched from notes/goals-summary.md
+  patterns:         null,  // fetched from notes/patterns.md
+  pendingPatterns:  null,  // patterns doc update pending save
+  deepFetched:      false, // whether FETCH_DEEP has fired this session
+  _queuedPatterns:  null,  // patterns update queued to show after entry bar clears
+  peopleProfile:    null,  // fetched from notes/people-profile.md
+  pendingPeople:    null,  // people profile update pending save
+  evolution:        null,  // fetched from notes/evolution.md
+  pendingEvolution: null,  // evolution update pending save
+  evoTrigger:       false, // whether evolution entry should be prompted this session
+  _queuedPeople:    null,  // people update queued after patterns bar clears
+  _queuedEvolution: null,  // evolution update queued after people bar clears
 };
 ```
 
@@ -145,7 +157,7 @@ const S = {
 `buildSysPrompt()` joins sections with `\n\n`, filtered for truthiness:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → recentContext → graymatterTrend → trendAwareness → fetchDeep → coaching → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → peopleContext → recentContext → graymatterTrend → trendAwareness → fetchDeep → coaching → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → peopleUpdate → evolutionUpdate → misc
 ```
 
 `stateDoc` is fetched from `notes/state-of-miles.md` at session start. Update whenever health context changes — diagnoses, meds, labs, open threads. Sat/Sun medication reminders injected here.
@@ -153,6 +165,10 @@ identity → context → stateDoc → goalsContext → patternsContext → recen
 `goalsContext` is fetched from `notes/goals-summary.md` — 3–5 line active goals summary. Not the full goals doc. Update when priorities shift. Claude references this during conversation to surface goal connections and flag stagnation. Suppressed on hard days / health flares.
 
 `patternsContext` is fetched from `notes/patterns.md` — Claude's accumulated observations across sessions. Injected as context; Claude uses it without referencing it directly. Updated by Claude via `<<<PATTERNS_START>>>` / `<<<PATTERNS_END>>>` markers at session end. Miles confirms before saving.
+
+`peopleContext` is fetched from `notes/people-profile.md` — YAML ledger of people in Miles's life. Claude updates it via `<<<PEOPLE_START>>>` / `<<<PEOPLE_END>>>` markers when named people are mentioned. Queued to save after patterns bar. Dashboard reads this for the Inner Circle section.
+
+`evolutionUpdate` is injected only when 90+ days have passed since the last evolution entry (or no entry exists), and at least 7 days since last offered. Claude writes a life phase summary via `<<<EVOLUTION_START>>>` / `<<<EVOLUTION_END>>>` markers. Queued last in the save chain. Dashboard reads this for the Evolution section.
 
 `recentContext` is the last 3 daily entries, **compressed** (YAML frontmatter + first paragraph of Narrative only, ~300 tokens per entry). Gives Claude scores and narrative thread without full entry weight.
 
@@ -198,6 +214,23 @@ No markdown in conversational messages. The UI renders `textContent`, not HTML �
 Tone: direct, specific, human. Friend who knows medicine and how to ask the right question — not a therapist reading from a script. Explicit avoid list in the `voice` section covers: padding adverbs ("quietly", "deeply"), AI vocabulary ("delve", "leverage", "robust"), negative parallelism ("It's not X. It's Y."), fake suspense ("Here's the thing"), rhetorical self-questions, em-dash overuse, tricolon pileups, signposted conclusions.
 
 Entry output (inside `<<<ENTRY_START>>>` / `<<<ENTRY_END>>>`) still uses markdown — that content is saved to GitHub and intentionally structured.
+
+---
+
+## Save Bar Chain
+
+Save bars queue in order. Each bar shows only after the previous is saved or dismissed:
+
+```
+entry → patterns → people → evolution
+```
+
+- Entry bar: always first. `showSaveBar()` → `saveEntry()` / `dismissSave()`
+- Patterns bar: queued via `S._queuedPatterns` if entry is also present
+- People bar: queued via `S._queuedPeople` if entry or patterns is present
+- Evolution bar: queued via `S._queuedEvolution` — always last
+
+If only one type is present (e.g. people with no entry), it shows immediately.
 
 ---
 
@@ -348,6 +381,8 @@ miles-data/                          ← or whatever you name it
     ├── state-of-miles.md            ← health context
     ├── goals-summary.md             ← active goals (3–5 lines, Claude reads this)
     ├── patterns.md                  ← accumulated patterns (Claude maintains)
+    ├── people-profile.md            ← people YAML ledger (Claude maintains)
+    ├── evolution.md                 ← quarterly life phase entries (Claude maintains)
     └── reflections/
 ```
 
@@ -374,9 +409,66 @@ miles-data/                          ← or whatever you name it
 | **Private data repo** | ✅ Architecture ready — `ar_repo` config points to private data repo; see migration instructions |
 | **Data migration** | Day One exports → journal/daily/; goals ✅ done; see migration-status.md |
 | **Clinical Project** | Separate Claude Project for appointment prep — lab_results_compiled.csv is the source |
-| **Dashboard** | Trend charts for graymatter scores — build after 3+ months of data |
+| **Dashboard** | ✅ Done — `dashboard.html`; radar charts, score bars, almanac heatmap, behavioral correlations, Co-Star AI observations + missions (Haiku, cached), inner circle, evolution |
+| **People profile** | ✅ Done — `notes/people-profile.md`; Claude maintains YAML ledger during sessions |
+| **Evolution** | ✅ Done — `notes/evolution.md`; auto-triggers every 90 days, 7-day dismiss cooldown |
 | **Reflections** | Deeper synthesis docs stored in notes/reflections/ |
 | **Sleep study** | Medical — update state-of-miles.md when results are in |
+
+---
+
+## Dashboard
+
+`dashboard.html` — separate page, shares `miles-archive.css` and `miles-archive.js`. Calls `initDash()` on load.
+
+**Data sources (all fetched in parallel on load):**
+- Last 14 daily entries: YAML graymatter scores + boolean fields (alcohol, medications, wind_down)
+- `notes/patterns.md`
+- `notes/people-profile.md`
+- `notes/evolution.md`
+
+**Computed locally (no API):**
+- Per-metric averages + trend directions (↑/↓/→)
+- Pentagon radar SVGs (Physical: Energy/Pain/Sleep/Diet/Hydration; Mental: Mood/Anxiety/Motivation/Social/Clarity)
+- Score bars with sparklines
+- Emotional Almanac: mood average by day-of-week heatmap
+- Behavioral correlations: alcohol/wind-down boolean vs next-day metric deltas (min 4 pairs, min 0.4 delta to surface)
+- People velocity: Active (mentioned ≤14 days), Quiet (15–90 days), Fading (90+ days) — medical/professional types excluded
+
+**Haiku API call (cached):**
+- Cache key: `ar_dash_cache` in localStorage, keyed to `{lastEntryDate}_{entryCount}`
+- Only regenerates when new entries have been saved since last generation
+- Output: OVERVIEW (one Co-Star sentence), OBS1-3 (observations), MISSION1-3 (prescriptions), BLIND_SPOT
+- Parsed from structured prefixes in Haiku's response
+- `dashRefresh()` clears cache and reloads
+
+**People YAML format (`notes/people-profile.md`):**
+```yaml
+---
+last_updated: YYYY-MM-DD
+---
+people:
+  - name: Sarah
+    relationship: friend
+    type: regular
+    sessions_mentioned: 14
+    last_mentioned: YYYY-MM-DD
+    themes: [music, anxiety, support]
+```
+`type: medical` or `type: professional` excludes from velocity logic. Dashboard shows only people with `sessions_mentioned >= 3`.
+
+**Evolution format (`notes/evolution.md`):**
+```markdown
+---
+last_updated: YYYY-MM-DD
+---
+
+## YYYY-MM-DD
+**Phase: [name]**
+
+[narrative paragraphs — preserved verbatim across updates]
+```
+New entries prepend; previous entries preserved below. Dashboard shows the 3 most recent.
 
 ---
 
