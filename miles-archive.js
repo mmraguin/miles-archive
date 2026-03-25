@@ -1781,20 +1781,12 @@ async function callHaiku(systemPrompt, userMessage) {
 function parseDashInsights(text) {
   const KEYS = ['OVERVIEW', 'OBS1', 'OBS2', 'OBS3', 'MISSION1', 'MISSION2', 'MISSION3', 'BLIND_SPOT'];
   const sections = {};
-  let currentKey = null, currentLines = [];
-
-  for (const line of text.split('\n')) {
-    const matched = KEYS.find(k => line.startsWith(k + ':'));
-    if (matched) {
-      if (currentKey) sections[currentKey] = currentLines.join(' ').trim();
-      currentKey = matched;
-      currentLines = [line.slice(matched.length + 1).trim()];
-    } else if (currentKey && line.trim()) {
-      currentLines.push(line.trim());
-    }
+  const keyAlt = KEYS.join('|');
+  const re = new RegExp(`(${keyAlt}):([\\s\\S]*?)(?=(?:${keyAlt}):|$)`, 'g');
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    sections[m[1]] = m[2].trim().replace(/\s+/g, ' ');
   }
-  if (currentKey) sections[currentKey] = currentLines.join(' ').trim();
-
   return {
     overview:  sections['OVERVIEW'] || '',
     obs:       [sections['OBS1'], sections['OBS2'], sections['OBS3']].filter(Boolean),
@@ -1835,9 +1827,9 @@ OVERVIEW: [One sentence, 10-20 words. Name what defined this period. Not generic
 OBS1: [Metric name]: [One or two sentences. What the number shows. No softening.]
 OBS2: [Metric name]: [One or two sentences.]
 OBS3: [Metric name]: [One or two sentences.]
-MISSION1: [One imperative sentence. The action only. Nothing else.]
-MISSION2: [One imperative sentence. The action only. Nothing else.]
-MISSION3: [One imperative sentence. The action only. Nothing else.]
+MISSION1: [Verb phrase only. No because, no so that, no explanation. E.g.: "Log sleep within 30 minutes of waking."]
+MISSION2: [Verb phrase only. No because, no so that, no explanation.]
+MISSION3: [Verb phrase only. No because, no so that, no explanation.]
 BLIND_SPOT: [One sentence. What is consistently low, absent, or avoided.]`;
 
   const userMessage = `${entryCount} entries logged in this period.

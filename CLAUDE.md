@@ -171,7 +171,7 @@ identity → context → stateDoc → goalsContext → patternsContext → peopl
 
 Health context is no longer hardcoded in the system prompt. It's fetched at session start from `notes/state-of-miles.md` in the repo and injected as `stateDoc`.
 
-The template is at `state-of-miles-template.md` in this workspace. Copy it to `notes/state-of-miles.md` in the repo and keep it current — diagnoses, meds, medical team, current focus, open threads, recent labs.
+Keep `notes/state-of-miles.md` current — diagnoses, meds, medical team, current focus, open threads, recent labs.
 
 This means health context is always as fresh as the last time you updated the doc, and doesn't require a code change to reflect new information.
 
@@ -361,35 +361,6 @@ Path mappings for `weekly/`, `monthly/`, and `summaries/` are in the code but th
 
 ---
 
-## What's Not Built Yet
-
-| Feature | Status |
-|---|---|
-| **Model update** | ✅ Done — `claude-sonnet-4-6` |
-| **`detectType` fix** | ✅ Done — checks entry content, not reply preamble |
-| **Garmin sync retired** | ✅ Done — replaced by bevel.ai paste flow |
-| **bevel.ai paste flow** | ✅ Done — Claude asks for health summary at session start |
-| **New daily file format** | ✅ Done — YAML frontmatter + Health + Narrative + Graymatter + Notes |
-| **Voice + tone prompt** | ✅ Done — HOW TO RESPOND rules added; no markdown in chat |
-| **Pronoun fix** | ✅ Done — she/her throughout |
-| **Session memory** | ✅ Done — last 3 entries fetched compressed at session start |
-| **State of Miles doc** | ✅ Done — `notes/state-of-miles.md`; auto-update via markers |
-| **Graymatter trend** | ✅ Done — YAML scores parsed, injected as trend table |
-| **Goals context** | ✅ Done — `notes/goals-summary.md` fetched at session start; active goals injected |
-| **Patterns doc** | ✅ Done — `notes/patterns.md` fetched at session start; updated via `<<<PATTERNS_START>>>` / `<<<PATTERNS_END>>>` markers after entry; queued behind entry save bar |
-| **Deep context fetch** | ✅ Done — `<<<FETCH_DEEP>>>` marker triggers background fetch of entries 4–14 days ago; compressed and injected into conversation |
-| **Intelligent logger** | ✅ Done — unified mode: logging + pattern observation + goal awareness in every session |
-| **Private data repo** | ✅ Architecture ready — `ar_repo` config points to private data repo; see migration instructions |
-| **Data migration** | Day One exports → journal/daily/; goals ✅ done; see migration-status.md |
-| **Clinical Project** | Separate Claude Project for appointment prep — lab_results_compiled.csv is the source |
-| **Dashboard** | ✅ Done — `dashboard.html`; radar charts, score bars, almanac heatmap, behavioral correlations, Co-Star AI observations + missions (Haiku, cached), inner circle, evolution |
-| **People profile** | ✅ Done — `notes/people-profile.md`; Claude maintains YAML ledger during sessions |
-| **Evolution** | ✅ Done — `notes/evolution.md`; auto-triggers every 90 days, 7-day dismiss cooldown |
-| **Reflections** | Deeper synthesis docs stored in notes/reflections/ |
-| **Sleep study** | Medical — update state-of-miles.md when results are in |
-
----
-
 ## Dashboard
 
 `dashboard.html` — separate page, shares `miles-archive.css` and `miles-archive.js`. Calls `initDash()` on load.
@@ -447,7 +418,7 @@ New entries prepend; previous entries preserved below. Dashboard shows the 3 mos
 
 ## Working Rules
 
-- Read all three app files before changing any of them
+- Read all four app files before changing any of them
 - Match existing code style exactly
 - Wrap all localStorage in try/catch
 - Use `friendlyError()` for all user-facing errors
