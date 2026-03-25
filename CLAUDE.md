@@ -15,33 +15,19 @@ Dashboard: `https://mmraguin.github.io/miles-archive/dashboard.html`
 
 ## This Workspace
 
+App repo (`mmraguin/miles-archive`) — GitHub Pages source, six files:
+
 ```
-Miles Intelligence System/
+miles-archive/
 ├── CLAUDE.md                    ← this file
-├── migration-status.md          ← data migration tracker
-├── project.txt                  ← Day One export (~2018–present), pending migration
-├── goals/
-│   ├── current.md               ← 2026 goals (Life Zones → Outcomes → Milestones)
-│   └── archive/
-│       ├── 2023.md              ← identity work, breakup recovery
-│       ├── 2024.md              ← diagnosis year, health + creative exploration
-│       └── 2025.md              ← treatment, home, relationships, music
-├── journal/                     ← daily entries uploaded via app
-├── Git/                         ← live app files (deploy from here)
-│   ├── index.html
-│   ├── dashboard.html
-│   ├── miles-archive.css
-│   └── miles-archive.js
-├── New notion goals/            ← processed: Outcome + Milestone CSVs (2023–2026)
-└── Exports/                     ← raw data pending migration
-    ├── Day One/                 ← mental.txt, notes.txt, Lyrics.txt, Spots.txt
-    ├── Garmin/                  ← activities CSV, sleep CSV, menstrual cycles
-    ├── Notion/                  ← journal logs, medical tracker, heart health CSVs
-    ├── goals/                   ← original Notion goal exports by year (source used)
-    └── lab results/             ← lab_results_compiled.csv (full lab history)
+├── index.html
+├── dashboard.html
+├── miles-archive.css
+├── miles-archive.js
+└── garmin_sync.py               ← retired, no longer used
 ```
 
-The repo (`mmraguin/miles-archive`) has its own structure — journal/, summaries/, goals/, habits/, notes/. See Repo Structure below.
+All journal data, notes, and goals live in the private data repo. See Repo Structure below.
 
 ---
 
@@ -349,42 +335,29 @@ YAML and markdown sections are intentionally both present — YAML for machine r
 
 ## Repo Structure
 
-Two separate repos after the split:
-
-**Public app repo** (`mmraguin/miles-archive`) — GitHub Pages source:
+**Private data repo** (configured in `ar_repo`):
 ```
-mmraguin/miles-archive/
-├── index.html
-├── miles-archive.css
-└── miles-archive.js
-```
-
-**Private data repo** (configured in `ar_repo`) — all journal data:
-```
-miles-data/                          ← or whatever you name it
+miles-data/
 ├── journal/
-│   ├── daily/
-│   │   ├── 2025/YYYY-MM-DD.md
-│   │   └── 2026/YYYY-MM-DD.md
-│   ├── weekly/YYYY-WNN.md
-│   └── monthly/YYYY-MM.md
-├── summaries/
-│   ├── psychiatrist/YYYY-MM-DD.md
-│   └── rheumatologist/YYYY-MM-DD.md
+│   └── daily/
+│       ├── 2024/YYYY-MM-DD.md
+│       ├── 2025/YYYY-MM-DD.md
+│       └── 2026/YYYY-MM-DD.md
 ├── goals/
 │   ├── current.md
-│   └── archive/YYYY.md
-├── habits/
-│   ├── habitify-exports/
-│   └── garmin-exports/
+│   └── archive/
+│       ├── 2023.md
+│       ├── 2024.md
+│       └── 2025.md
 └── notes/
     ├── state-of-miles.md            ← health context
     ├── goals-summary.md             ← active goals (3–5 lines, Claude reads this)
     ├── patterns.md                  ← accumulated patterns (Claude maintains)
-    ├── people-profile.md            ← people YAML ledger (Claude maintains)
-    ├── evolution.md                 ← quarterly life phase entries (Claude maintains)
-    └── reflections/
+    ├── people-profile.md            ← people YAML ledger (Claude maintains, created on first write)
+    └── evolution.md                 ← quarterly life phase entries (Claude maintains, created on first write)
 ```
+
+Path mappings for `weekly/`, `monthly/`, and `summaries/` are in the code but those folders haven't been populated yet.
 
 ---
 
