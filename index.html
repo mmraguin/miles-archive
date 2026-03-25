@@ -18,6 +18,7 @@
       <button class="nav-btn" id="brief-btn" onclick="toggleBrief()">brief</button>
       <button class="nav-btn" onclick="openFetch()">fetch</button>
       <button class="nav-btn" onclick="newSess()">new</button>
+      <a class="nav-btn" href="dashboard.html">dash</a>
       <button class="nav-btn" id="cfg-btn" onclick="openCfg()">⚙</button>
     </div>
   </div>
@@ -51,6 +52,30 @@
       <button id="state-go" onclick="saveState()">Save to GitHub →</button>
       <button id="state-no" onclick="dismissState()">discard</button>
       <span id="state-st"></span>
+    </div>
+  </div>
+
+  <div id="people-bar">
+    <div id="people-top">
+      <span id="people-lbl">People profile update</span>
+      <span id="people-path">notes/people-profile.md</span>
+    </div>
+    <div id="people-row">
+      <button id="people-go" onclick="savePeople()">Save to GitHub →</button>
+      <button id="people-no" onclick="dismissPeople()">discard</button>
+      <span id="people-st"></span>
+    </div>
+  </div>
+
+  <div id="evo-bar">
+    <div id="evo-top">
+      <span id="evo-lbl">Evolution entry</span>
+      <span id="evo-path">notes/evolution.md</span>
+    </div>
+    <div id="evo-row">
+      <button id="evo-go" onclick="saveEvolution()">Save to GitHub →</button>
+      <button id="evo-no" onclick="dismissEvolution()">discard</button>
+      <span id="evo-st"></span>
     </div>
   </div>
 

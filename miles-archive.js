@@ -27,6 +27,13 @@ const S = {
   pendingPatterns:  null,  // patterns doc update pending save
   deepFetched:      false, // whether deep context fetch has fired this session
   _queuedPatterns:  null,  // patterns update queued to show after entry bar clears
+  peopleProfile:    null,  // fetched from notes/people-profile.md
+  pendingPeople:    null,  // people profile update pending save
+  evolution:        null,  // fetched from notes/evolution.md
+  pendingEvolution: null,  // evolution update pending save
+  evoTrigger:       false, // whether evolution entry should be prompted this session
+  _queuedPeople:    null,  // people update queued to show after patterns bar clears
+  _queuedEvolution: null,  // evolution update queued to show after people bar clears
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -387,11 +394,62 @@ When updating, also clean the doc: mark resolved patterns as resolved, remove De
 
 Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
 
+  // ── Section: People profile context
+  const peopleContext = S.peopleProfile
+    ? `PEOPLE PROFILE\n${S.peopleProfile}\n\nRunning record of people in Miles's life. Use to recognize names, relationships, recurring themes. Don't reference the doc explicitly.`
+    : '';
+
+  // ── Section: People profile update instructions
+  const peopleUpdate = `PEOPLE PROFILE UPDATES
+After the journal entry, if any named person was mentioned this session, output the complete updated people profile:
+
+<<<PEOPLE_START>>>
+---
+last_updated: ${date}
+---
+people:
+  - name: [Name]
+    relationship: [friend/family/partner/colleague/doctor/therapist/other]
+    type: [regular/medical/professional]
+    sessions_mentioned: [N]
+    last_mentioned: ${date}
+    themes: [theme1, theme2]
+<<<PEOPLE_END>>>
+
+Rules:
+- sessions_mentioned: total count of sessions this person has appeared in — increment by 1 for current session if mentioned today
+- type: medical for doctors/therapists/clinical, professional for work contacts, regular for everyone else
+- Before creating a new entry, check if the name matches an existing one — merge variations (nickname, surname), never duplicate
+- Update relationship or themes if context changed this session
+- Output the full file preserving all existing entries
+- Only emit if at least one named person was mentioned today`;
+
+  // ── Section: Evolution update (only injected when triggered)
+  const evolutionUpdate = S.evoTrigger ? `EVOLUTION ENTRY
+${S.evolution ? `Last evolution: ${parseEvolutionDate(S.evolution)}. ${Math.floor((Date.now() - new Date(parseEvolutionDate(S.evolution) + 'T00:00:00Z')) / 86400000)} days ago.` : 'No evolution entry exists yet.'}
+
+At session end, after all other updates, if this session had enough substance, write a life phase summary:
+
+<<<EVOLUTION_START>>>
+---
+last_updated: ${date}
+---
+
+## ${date}
+**Phase: [2-4 word name for this life phase]**
+
+[3-4 paragraphs. What this phase looks and feels like. What's shifted since the last entry, or since you started if this is the first. The emotional arc — not just events. What she seems to be moving toward.]
+
+[Preserve all previous ## date entries below this one, verbatim.]
+<<<EVOLUTION_END>>>
+
+Skip if: routine numbers session, Miles is clearly exhausted or in brief mode, not enough to synthesize into a genuine phase observation.` : '';
+
   // ── Section: Language + notability
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, peopleContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, peopleUpdate, evolutionUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -573,6 +631,20 @@ function extractPatterns(txt) {
   return txt.slice(s + 20, e).trim();
 }
 
+function extractPeople(txt) {
+  const s = txt.indexOf('<<<PEOPLE_START>>>');
+  const e = txt.indexOf('<<<PEOPLE_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 18, e).trim();
+}
+
+function extractEvolution(txt) {
+  const s = txt.indexOf('<<<EVOLUTION_START>>>');
+  const e = txt.indexOf('<<<EVOLUTION_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 21, e).trim();
+}
+
 function detectType(reply) {
   // Check the entry content (not the reply preamble) to avoid misfiling
   const entry = extractEntry(reply) || reply;
@@ -752,6 +824,11 @@ function dismissPatterns() {
   S.pendingPatterns = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
+  if (S._queuedPeople) {
+    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+  } else if (S._queuedEvolution) {
+    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  }
 }
 
 async function savePatterns() {
@@ -792,9 +869,128 @@ async function savePatterns() {
     setTimeout(() => {
       document.getElementById('pat-bar').classList.remove('show');
       document.getElementById('pat-st').className = '';
+      if (S._queuedPeople) {
+        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+      } else if (S._queuedEvolution) {
+        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      }
     }, 2400);
   } catch(err) {
     setPatSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── People profile save ───────────────────────────────────────────────────────
+function setPeopleSt(type, txt) {
+  const e = document.getElementById('people-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showPeopleBar(content) {
+  S.pendingPeople = content;
+  document.getElementById('people-go').disabled = false;
+  document.getElementById('people-st').className = '';
+  document.getElementById('people-bar').classList.add('show');
+}
+
+function dismissPeople() {
+  S.pendingPeople = null;
+  document.getElementById('people-bar').classList.remove('show');
+  document.getElementById('people-st').className = '';
+  if (S._queuedEvolution) {
+    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  }
+}
+
+async function savePeople() {
+  if (!S.pendingPeople) return;
+  const btn = document.getElementById('people-go');
+  btn.disabled = true;
+  setPeopleSt('info', 'writing…');
+  try {
+    const path = 'notes/people-profile.md';
+    const { sha } = await getFileInfo(path);
+    const body = { message: 'people: update notes/people-profile.md', content: b64Encode(S.pendingPeople) };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.peopleProfile = S.pendingPeople;
+    setPeopleSt('ok', 'saved');
+    addSys('people profile updated → notes/people-profile.md');
+    S.pendingPeople = null;
+    setTimeout(() => {
+      document.getElementById('people-bar').classList.remove('show');
+      document.getElementById('people-st').className = '';
+      if (S._queuedEvolution) {
+        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      }
+    }, 2400);
+  } catch(err) {
+    setPeopleSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── Evolution save ────────────────────────────────────────────────────────────
+function setEvoSt(type, txt) {
+  const e = document.getElementById('evo-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showEvoBar(content) {
+  S.pendingEvolution = content;
+  document.getElementById('evo-go').disabled = false;
+  document.getElementById('evo-st').className = '';
+  document.getElementById('evo-bar').classList.add('show');
+}
+
+function dismissEvolution() {
+  S.pendingEvolution = null;
+  document.getElementById('evo-bar').classList.remove('show');
+  document.getElementById('evo-st').className = '';
+}
+
+async function saveEvolution() {
+  if (!S.pendingEvolution) return;
+  const btn = document.getElementById('evo-go');
+  btn.disabled = true;
+  setEvoSt('info', 'writing…');
+  try {
+    const path = 'notes/evolution.md';
+    const { sha } = await getFileInfo(path);
+    const body = { message: 'evolution: update notes/evolution.md', content: b64Encode(S.pendingEvolution) };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.evolution = S.pendingEvolution;
+    S.evoTrigger = false;
+    try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {}
+    setEvoSt('ok', 'saved');
+    addSys('evolution updated → notes/evolution.md');
+    S.pendingEvolution = null;
+    setTimeout(() => {
+      document.getElementById('evo-bar').classList.remove('show');
+      document.getElementById('evo-st').className = '';
+    }, 2400);
+  } catch(err) {
+    setEvoSt('err', friendlyError(err));
     btn.disabled = false;
   }
 }
@@ -867,25 +1063,36 @@ async function sendMsg() {
   try {
     const reply = await callClaude(S.messages);
     hideDots();
-    const entry    = extractEntry(reply);
-    const state    = extractState(reply);
-    const patterns = extractPatterns(reply);
+    const entry     = extractEntry(reply);
+    const state     = extractState(reply);
+    const patterns  = extractPatterns(reply);
+    const people    = extractPeople(reply);
+    const evolution = extractEvolution(reply);
     const deepFetch = reply.includes('<<<FETCH_DEEP>>>');
     // Strip all markers from displayed text
     let disp = reply;
-    if (entry)    disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
-    if (state)    disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
-    if (patterns) disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
+    if (entry)     disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
+    if (state)     disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
+    if (patterns)  disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
+    if (people)    disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
+    if (evolution) disp = disp.replace(/<<<EVOLUTION_START>>>[\s\S]*?<<<EVOLUTION_END>>>/g, '').trim();
     disp = disp.replace(/<<<FETCH_DEEP>>>/g, '').trim();
     addMsg('assistant', disp || 'Done.');
     S.messages.push({ role: 'assistant', content: reply });
     saveDraft();
     if (state) showStateBar(state);
-    // Queue patterns after entry bar, or show immediately if no entry
-    if (patterns && entry) {
-      S._queuedPatterns = patterns;
-    } else if (patterns) {
-      showPatBar(patterns);
+    // Queue order: entry → patterns → people → evolution
+    if (patterns) {
+      if (entry) S._queuedPatterns = patterns;
+      else showPatBar(patterns);
+    }
+    if (people) {
+      if (entry || patterns) S._queuedPeople = people;
+      else showPeopleBar(people);
+    }
+    if (evolution) {
+      if (entry || patterns || people) S._queuedEvolution = evolution;
+      else showEvoBar(evolution);
     }
     if (entry) showSaveBar(entry, detectType(reply));
     setStat('ready', `ready — ${S.sessionDate}`);
@@ -928,10 +1135,16 @@ function _clearAndStart() {
   S.brief = false; S.existingEntry = null; S.recentEntries = []; S.stateOfMiles = null;
   S.goals = null; S.patterns = null; S.pendingPatterns = null;
   S.deepFetched = false; S._queuedPatterns = null;
+  S.peopleProfile = null; S.pendingPeople = null; S._queuedPeople = null;
+  S.evolution = null; S.pendingEvolution = null; S.evoTrigger = false; S._queuedEvolution = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
   document.getElementById('state-bar').classList.remove('show');
   document.getElementById('state-st').className = '';
+  document.getElementById('people-bar').classList.remove('show');
+  document.getElementById('people-st').className = '';
+  document.getElementById('evo-bar').classList.remove('show');
+  document.getElementById('evo-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
   document.getElementById('chat').innerHTML = '';
   document.getElementById('save-bar').classList.remove('show');
@@ -985,8 +1198,29 @@ function compressEntry(content) {
   return parts.join('\n\n') || content.slice(0, 500);
 }
 
-function fetchGoals()    { return fetchEntry('notes/goals-summary.md'); }
-function fetchPatterns() { return fetchEntry('notes/patterns.md'); }
+function fetchGoals()         { return fetchEntry('notes/goals-summary.md'); }
+function fetchPatterns()      { return fetchEntry('notes/patterns.md'); }
+function fetchPeopleProfile() { return fetchEntry('notes/people-profile.md'); }
+function fetchEvolution()     { return fetchEntry('notes/evolution.md'); }
+
+function parseEvolutionDate(content) {
+  if (!content) return null;
+  const m = content.match(/last_updated:\s*(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
+function _computeEvoTrigger(evolutionContent) {
+  const lastDate = parseEvolutionDate(evolutionContent);
+  const daysSince = lastDate
+    ? Math.floor((Date.now() - new Date(lastDate + 'T00:00:00Z')) / 86400000)
+    : 999;
+  let lastOffered = null;
+  try { lastOffered = localStorage.getItem('ar_evo_offered'); } catch(e) {}
+  const daysSinceOffered = lastOffered
+    ? Math.floor((Date.now() - new Date(lastOffered + 'T00:00:00Z')) / 86400000)
+    : 999;
+  return daysSince >= 90 && daysSinceOffered >= 7;
+}
 
 // ── Fetch entries 4–14 days ago in parallel (triggered by <<<FETCH_DEEP>>>) ───
 async function fetchDeepEntries() {
@@ -1075,16 +1309,22 @@ function buildGraymatterTrend(entries) {
 
 // ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
-  const [recentEntries, stateOfMiles, goals, patterns] = await Promise.all([
+  const [recentEntries, stateOfMiles, goals, patterns, peopleProfile, evolution] = await Promise.all([
     fetchRecentEntries(),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
+    fetchPeopleProfile(),
+    fetchEvolution(),
   ]);
   S.recentEntries = recentEntries;
   S.stateOfMiles  = stateOfMiles;
   S.goals         = goals;
   S.patterns      = patterns;
+  S.peopleProfile = peopleProfile;
+  S.evolution     = evolution;
+  S.evoTrigger    = _computeEvoTrigger(evolution);
+  if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }
 }
 
 // ── Start session ─────────────────────────────────────────────────────────────
@@ -1097,19 +1337,25 @@ async function startSess() {
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
-  // Fetch today's entry + recent days + state doc + goals + patterns in parallel
-  const [existing, recentEntries, stateOfMiles, goals, patterns] = await Promise.all([
+  // Fetch today's entry + recent days + state doc + goals + patterns + people + evolution in parallel
+  const [existing, recentEntries, stateOfMiles, goals, patterns, peopleProfile, evolution] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
+    fetchPeopleProfile(),
+    fetchEvolution(),
   ]);
-  S.existingEntry = existing;
-  S.recentEntries = recentEntries;
-  S.stateOfMiles  = stateOfMiles;
-  S.goals         = goals;
-  S.patterns      = patterns;
+  S.existingEntry  = existing;
+  S.recentEntries  = recentEntries;
+  S.stateOfMiles   = stateOfMiles;
+  S.goals          = goals;
+  S.patterns       = patterns;
+  S.peopleProfile  = peopleProfile;
+  S.evolution      = evolution;
+  S.evoTrigger     = _computeEvoTrigger(evolution);
+  if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }
 
   const openingContent = existing
     ? `Start the journal session. It is ${timeHint} in Manila. Today already has an entry — load it as context and treat this as a continuation of the same day. When producing the final entry, merge and combine both sessions into one cohesive document — preserve the earlier narrative, append new material, and update graymatter to reflect the full day.
@@ -1258,36 +1504,621 @@ function tvField(id, btn) {
   btn.textContent = el.type === 'password' ? 'show' : 'hide';
 }
 
-// ── iOS keyboard / viewport fix ──────────────────────────────────────────────
-(function() {
-  if (!window.visualViewport) return;
+// ── iOS keyboard / viewport fix (index.html only) ────────────────────────────
+if (document.getElementById('app')) {
+  (function() {
+    if (!window.visualViewport) return;
 
-  function onViewportChange() {
-    const vv     = window.visualViewport;
-    const app    = document.getElementById('app');
-    const isIOS  = /iP(hone|ad|od)/.test(navigator.userAgent) ||
-                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    if (isIOS) {
-      // Pin app to the visual viewport — keeps input above keyboard
-      app.style.height    = vv.height + 'px';
-      app.style.position  = 'fixed';
-      app.style.top       = vv.offsetTop + 'px';
-      app.style.left      = vv.offsetLeft + 'px';
-      app.style.width     = vv.width + 'px';
-    } else {
-      app.style.height = vv.height + 'px';
+    function onViewportChange() {
+      const vv    = window.visualViewport;
+      const app   = document.getElementById('app');
+      const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+                    (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.userAgent));
+      if (isIOS) {
+        app.style.height   = vv.height + 'px';
+        app.style.position = 'fixed';
+        app.style.top      = vv.offsetTop + 'px';
+        app.style.left     = vv.offsetLeft + 'px';
+        app.style.width    = vv.width + 'px';
+      } else {
+        app.style.height = vv.height + 'px';
+      }
+      setTimeout(() => {
+        const chat = document.getElementById('chat');
+        if (chat) chat.scrollTop = chat.scrollHeight;
+      }, 100);
     }
 
-    // Scroll chat to bottom after keyboard animation settles
-    setTimeout(() => {
-      const chat = document.getElementById('chat');
-      chat.scrollTop = chat.scrollHeight;
-    }, 100);
+    window.visualViewport.addEventListener('resize', onViewportChange);
+    window.visualViewport.addEventListener('scroll', onViewportChange);
+  })();
+
+  init();
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+
+function initDash() {
+  const wmDate = document.getElementById('wm-date');
+  if (wmDate) wmDate.textContent = todayManila();
+  if (!credsReady()) { window.location.href = 'index.html'; return; }
+  loadDash();
+}
+
+function dashRefresh() {
+  try { localStorage.removeItem('ar_dash_cache'); } catch(e) {}
+  loadDash();
+}
+
+// ── Dashboard: data fetching ──────────────────────────────────────────────────
+
+async function fetchDashEntries(days) {
+  const today = todayManila();
+  const dates = Array.from({ length: days }, (_, i) => daysAgo(today, i + 1));
+  const results = await Promise.allSettled(
+    dates.map(date =>
+      fetchEntry(`journal/daily/${date.slice(0,4)}/${date}.md`)
+        .then(content => {
+          if (!content) return null;
+          const scores   = parseGraymatter(content);
+          const booleans = parseDashBooleans(content);
+          const dow      = new Date(date + 'T00:00:00Z').getUTCDay();
+          return scores ? { date, scores, booleans, dow } : null;
+        })
+    )
+  );
+  return results
+    .filter(r => r.status === 'fulfilled' && r.value)
+    .map(r => r.value)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function parseDashBooleans(content) {
+  if (!content || !content.startsWith('---')) return {};
+  const end = content.indexOf('\n---', 3);
+  if (end === -1) return {};
+  const yaml = content.slice(3, end);
+  const gmIdx = yaml.indexOf('graymatter:');
+  if (gmIdx === -1) return {};
+  const gm = yaml.slice(gmIdx + 11);
+  const result = {};
+  for (const line of gm.split('\n')) {
+    const m = line.match(/^\s{2}(medications|alcohol|wind_down):\s*(true|false)/);
+    if (m) result[m[1]] = m[2] === 'true';
+  }
+  return result;
+}
+
+function parsePeopleProfile(content) {
+  if (!content) return [];
+  const people = [];
+  const blocks = content.split(/\n  - name:/).slice(1);
+  for (const block of blocks) {
+    const name         = block.match(/^(.+)/)?.[1]?.trim();
+    const relationship = block.match(/relationship:\s*(.+)/)?.[1]?.trim() || '';
+    const type         = block.match(/\btype:\s*(.+)/)?.[1]?.trim() || 'regular';
+    const sessions     = parseInt(block.match(/sessions_mentioned:\s*(\d+)/)?.[1] || '0', 10);
+    const lastMention  = block.match(/last_mentioned:\s*(\d{4}-\d{2}-\d{2})/)?.[1] || null;
+    const themesMatch  = block.match(/themes:\s*\[(.+?)\]/);
+    const themes       = themesMatch ? themesMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')) : [];
+    if (name) people.push({ name, relationship, type, sessions_mentioned: sessions, last_mentioned: lastMention, themes });
+  }
+  return people;
+}
+
+function parseEvolutionEntries(content) {
+  if (!content) return [];
+  const entries = [];
+  const blocks = content.split(/\n## (\d{4}-\d{2}-\d{2})/).slice(1);
+  for (let i = 0; i < blocks.length; i += 2) {
+    const date = blocks[i];
+    const body = blocks[i + 1] || '';
+    const phaseMatch = body.match(/\*\*Phase:\s*(.+?)\*\*/);
+    const phase = phaseMatch ? phaseMatch[1].trim() : '';
+    const text = body.replace(/\*\*Phase:.*?\*\*/, '').trim();
+    entries.push({ date, phase, text });
+  }
+  return entries;
+}
+
+// ── Dashboard: computations ───────────────────────────────────────────────────
+
+function computeDashAverages(entries) {
+  const sums = {}, counts = {};
+  for (const { scores } of entries) {
+    for (const [k, v] of Object.entries(scores)) {
+      sums[k] = (sums[k] || 0) + v;
+      counts[k] = (counts[k] || 0) + 1;
+    }
+  }
+  const avgs = {};
+  for (const k of Object.keys(sums)) avgs[k] = Math.round((sums[k] / counts[k]) * 10) / 10;
+  return avgs;
+}
+
+function computeSparkValues(entries, metric) {
+  // Returns array of values (or null) for last N entries, oldest first
+  return entries.map(e => e.scores[metric] ?? null);
+}
+
+function computeTrend(entries, metric) {
+  const vals = entries.map(e => e.scores[metric]).filter(v => v != null);
+  if (vals.length < 3) return '→';
+  const half = Math.floor(vals.length / 2);
+  const early = vals.slice(0, half).reduce((a, b) => a + b, 0) / half;
+  const late  = vals.slice(-half).reduce((a, b) => a + b, 0) / half;
+  if (late - early > 0.4) return '↑';
+  if (early - late > 0.4) return '↓';
+  return '→';
+}
+
+function computeDayHeatmap(entries) {
+  const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const sums = new Array(7).fill(0), counts = new Array(7).fill(0);
+  for (const { dow, scores } of entries) {
+    if (scores['Mood'] != null) { sums[dow] += scores['Mood']; counts[dow]++; }
+  }
+  return labels.map((label, i) => ({
+    label,
+    avg: counts[i] ? Math.round((sums[i] / counts[i]) * 10) / 10 : null,
+    count: counts[i],
+  }));
+}
+
+function computeCorrelations(entries) {
+  const results = [];
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+
+  function correlate(boolKey, nextMetric, label) {
+    const pairs = sorted.slice(0, -1)
+      .map((e, i) => ({ flag: !!e.booleans?.[boolKey], next: sorted[i + 1]?.scores?.[nextMetric] }))
+      .filter(p => p.next != null);
+    if (pairs.length < 4) return;
+    const w  = pairs.filter(p => p.flag),  wo = pairs.filter(p => !p.flag);
+    if (w.length < 2 || wo.length < 2) return;
+    const avgW  = w.reduce((s, p) => s + p.next, 0) / w.length;
+    const avgWo = wo.reduce((s, p) => s + p.next, 0) / wo.length;
+    const delta = Math.round((avgW - avgWo) * 10) / 10;
+    if (Math.abs(delta) >= 0.4) results.push({ label, delta, n: pairs.length });
   }
 
-  window.visualViewport.addEventListener('resize', onViewportChange);
-  window.visualViewport.addEventListener('scroll', onViewportChange);
-})();
+  correlate('alcohol',   'Energy',        'Alcohol → next-day energy');
+  correlate('wind_down', 'Sleep Quality', 'Wind-down → next-day sleep');
+  correlate('alcohol',   'Mood',          'Alcohol → next-day mood');
+  return results;
+}
 
-init();
+function computeVelocity(person, today) {
+  if ((person.sessions_mentioned || 0) < 3) return 'new';
+  if (person.type === 'medical' || person.type === 'professional') return null;
+  if (!person.last_mentioned) return 'quiet';
+  const todayTs = new Date(today + 'T00:00:00Z').getTime();
+  const lastTs  = new Date(person.last_mentioned + 'T00:00:00Z').getTime();
+  const daysSince = (todayTs - lastTs) / 86400000;
+  if (daysSince <= 14)  return 'rising';
+  if (daysSince <= 90)  return 'quiet';
+  return 'fading';
+}
+
+// ── Dashboard: SVG helpers ────────────────────────────────────────────────────
+
+function makePentagonSvg(values, labels) {
+  const cx = 110, cy = 110, r = 78;
+  const n = values.length;
+  const angles = Array.from({ length: n }, (_, i) => ((i * (360 / n)) - 90) * Math.PI / 180);
+
+  const gridLines = [1, 2, 3, 4, 5].map(v => {
+    const pts = angles.map(a => {
+      const d = (v / 5) * r;
+      return `${(cx + d * Math.cos(a)).toFixed(1)},${(cy + d * Math.sin(a)).toFixed(1)}`;
+    });
+    return `<polygon points="${pts.join(' ')}" fill="none" stroke="#1e1e1e" stroke-width="1"/>`;
+  }).join('');
+
+  const axisLines = angles.map(a =>
+    `<line x1="${cx}" y1="${cy}" x2="${(cx + r * Math.cos(a)).toFixed(1)}" y2="${(cy + r * Math.sin(a)).toFixed(1)}" stroke="#1e1e1e" stroke-width="1"/>`
+  ).join('');
+
+  const dataPts = values.map((v, i) => {
+    const d = ((v || 0) / 5) * r;
+    return `${(cx + d * Math.cos(angles[i])).toFixed(1)},${(cy + d * Math.sin(angles[i])).toFixed(1)}`;
+  });
+  const dataPolygon = `<polygon points="${dataPts.join(' ')}" fill="rgba(78,205,180,0.15)" stroke="#4ecdb4" stroke-width="1.5"/>`;
+
+  const labelEls = labels.map((lbl, i) => {
+    const d = r + 22;
+    const x = cx + d * Math.cos(angles[i]);
+    const y = cy + d * Math.sin(angles[i]);
+    const anchor = Math.cos(angles[i]) > 0.15 ? 'start' : Math.cos(angles[i]) < -0.15 ? 'end' : 'middle';
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="#575250" font-family="DM Mono,monospace" font-size="8" letter-spacing="1">${lbl.toUpperCase()}</text>`;
+  }).join('');
+
+  const valid = values.filter(v => v != null && v > 0);
+  const avg = valid.length ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1) : '—';
+  const centerEl = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="#f0ece6" font-family="Fraunces,serif" font-size="20" font-style="italic">${avg}</text>`;
+
+  return `<svg viewBox="0 0 220 220" width="100%" style="max-width:220px;display:block">${gridLines}${axisLines}${dataPolygon}${labelEls}${centerEl}</svg>`;
+}
+
+function makeSparklineSvg(values) {
+  const w = 72, h = 20;
+  const valid = values.filter(v => v != null);
+  if (valid.length < 2) return '';
+  const pts = [];
+  values.forEach((v, i) => {
+    if (v == null) return;
+    const x = (i / (values.length - 1)) * w;
+    const y = h - ((v - 1) / 4) * (h - 4) - 2;
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" class="metric-spark"><polyline points="${pts.join(' ')}" fill="none" stroke="#4ecdb4" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+// ── Dashboard: Haiku insights ─────────────────────────────────────────────────
+
+async function callHaiku(systemPrompt, userMessage) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': CREDS.anthropicKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 800,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || `API error ${r.status}`); }
+  const data = await r.json();
+  if (!data.content?.[0]?.text) throw new Error('empty response');
+  return data.content[0].text;
+}
+
+function parseDashInsights(text) {
+  const get = (prefix) => {
+    const m = text.match(new RegExp(`${prefix}:\\s*(.+?)(?=\\n[A-Z_]+:|$)`, 's'));
+    return m ? m[1].trim() : '';
+  };
+  return {
+    overview:   get('OVERVIEW'),
+    obs:        [get('OBS1'), get('OBS2'), get('OBS3')].filter(Boolean),
+    missions:   [get('MISSION1'), get('MISSION2'), get('MISSION3')].filter(Boolean),
+    blindSpot:  get('BLIND_SPOT'),
+  };
+}
+
+async function generateDashInsights(avgs, correlations, patternsContent, people, entryCount, lastDate) {
+  const cacheKey = `${lastDate}_${entryCount}`;
+  try {
+    const cached = JSON.parse(localStorage.getItem('ar_dash_cache') || 'null');
+    if (cached && cached.key === cacheKey) return cached.insights;
+  } catch(e) {}
+
+  const metricLine = (keys) => keys
+    .filter(k => avgs[k] != null)
+    .map(k => `${k}: ${avgs[k]}`)
+    .join(' | ');
+
+  const physical = metricLine(['Energy', 'Pain/Inflammation', 'Sleep Quality', 'Diet Adherence', 'Hydration']);
+  const mental   = metricLine(['Mood', 'Anxiety', 'Motivation', 'Social Connection', 'Cognitive Clarity']);
+
+  const corrLines = correlations.length
+    ? correlations.map(c => `- ${c.label}: ${c.delta > 0 ? '+' : ''}${c.delta} (n=${c.n})`).join('\n')
+    : 'None detected yet.';
+
+  const patternsExcerpt = patternsContent ? patternsContent.slice(0, 500) : 'No patterns doc yet.';
+  const peopleNames = people.filter(p => p.sessions_mentioned >= 3).map(p => `${p.name} (${p.relationship})`).join(', ') || 'None yet.';
+
+  const systemPrompt = `You are Miles's personal intelligence system writing a dashboard analysis. Miles (she/her) lives in Manila with rheumatoid arthritis and POTS. You track her health, mood, behavior, and relationships.
+
+Tone: Co-Star — dry, precise, direct, occasionally unsettling. Not warm. Not clinical. Like someone who has been watching closely and noticed things the subject hasn't. No therapy-speak. No markdown. No em-dashes. Specific, not generic.
+
+Output exactly this structure:
+OVERVIEW: [One sentence, 10-20 words. Name what defined this period specifically.]
+OBS1: [metric or pattern name]: [1-2 sentences. What the data shows. No softening.]
+OBS2: [metric or pattern name]: [1-2 sentences.]
+OBS3: [metric or pattern name]: [1-2 sentences.]
+MISSION1: [One specific imperative sentence. Actionable.]
+MISSION2: [One specific imperative sentence.]
+MISSION3: [One specific imperative sentence.]
+BLIND_SPOT: [One sentence. What's consistently low, absent, or avoided.]`;
+
+  const userMessage = `${entryCount} entries logged in this period.
+
+PHYSICAL (avg/5): ${physical}
+MENTAL (avg/5): ${mental}
+
+BEHAVIORAL CORRELATIONS:
+${corrLines}
+
+PATTERNS EXCERPT:
+${patternsExcerpt}
+
+PEOPLE MENTIONED (3+ sessions):
+${peopleNames}`;
+
+  try {
+    const text = await callHaiku(systemPrompt, userMessage);
+    const insights = parseDashInsights(text);
+    try { localStorage.setItem('ar_dash_cache', JSON.stringify({ key: cacheKey, insights })); } catch(e) {}
+    return insights;
+  } catch(err) {
+    return { overview: '', obs: [], missions: [], blindSpot: '' };
+  }
+}
+
+// ── Dashboard: render ─────────────────────────────────────────────────────────
+
+function renderDash(entries, people, patternsContent, evoEntries, insights) {
+  const el = document.getElementById('dash-content');
+  if (!el) return;
+
+  const today = todayManila();
+  const avgs  = computeDashAverages(entries);
+  const heatmap = computeDayHeatmap(entries);
+  const correlations = computeCorrelations(entries);
+
+  const physMetrics = [
+    { key: 'Energy',           label: 'Energy' },
+    { key: 'Pain/Inflammation',label: 'Pain',   invert: true },
+    { key: 'Sleep Quality',    label: 'Sleep' },
+    { key: 'Diet Adherence',   label: 'Diet' },
+    { key: 'Hydration',        label: 'Hydro' },
+  ];
+  const mentMetrics = [
+    { key: 'Mood',              label: 'Mood' },
+    { key: 'Anxiety',           label: 'Anxiety', invert: true },
+    { key: 'Motivation',        label: 'Motiv' },
+    { key: 'Social Connection', label: 'Social' },
+    { key: 'Cognitive Clarity', label: 'Clarity' },
+  ];
+
+  // Pentagon values — inverted metrics: high pain/anxiety = low score visually
+  const physVals = physMetrics.map(m => {
+    const v = avgs[m.key];
+    return v != null ? (m.invert ? parseFloat((6 - v).toFixed(1)) : v) : null;
+  });
+  const mentVals = mentMetrics.map(m => {
+    const v = avgs[m.key];
+    return v != null ? (m.invert ? parseFloat((6 - v).toFixed(1)) : v) : null;
+  });
+
+  function metricBarColor(val) {
+    if (val == null) return '';
+    if (val <= 2.0) return ' low';
+    if (val <= 3.0) return ' mid';
+    return '';
+  }
+
+  function metricRow(m) {
+    const val    = avgs[m.key];
+    const trend  = computeTrend(entries, m.key);
+    const sparks = computeSparkValues(entries, m.key);
+    const pct    = val != null ? Math.round((val / 5) * 100) : 0;
+    const tClass = trend === '↑' ? 'up' : trend === '↓' ? 'down' : '';
+    const dispVal = m.invert && val != null ? (6 - val).toFixed(1) : (val != null ? val : '—');
+    return `<div class="metric-row">
+      <div class="metric-name">${m.label}</div>
+      <div class="metric-bar-wrap"><div class="metric-bar${metricBarColor(val)}" style="width:${pct}%"></div></div>
+      <div class="metric-score">${dispVal}</div>
+      <div class="metric-trend ${tClass}">${trend}</div>
+      ${makeSparklineSvg(sparks)}
+    </div>`;
+  }
+
+  // Date range label
+  const firstDate = entries.length ? entries[0].date : null;
+  const lastDate  = entries.length ? entries[entries.length - 1].date : null;
+  const rangeLabel = firstDate && lastDate
+    ? `${_fmtDate(firstDate)} — ${_fmtDate(lastDate)} · ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`
+    : 'no entries found';
+
+  // Almanac cells
+  const almanacCells = heatmap.map(day => {
+    const intensity = day.avg != null ? (day.avg - 1) / 4 : 0;
+    const bg = day.avg != null
+      ? `rgba(78,205,180,${(0.08 + intensity * 0.55).toFixed(2)})`
+      : 'var(--surface)';
+    return `<div class="almanac-day">
+      <div class="almanac-label">${day.label}</div>
+      <div class="almanac-cell" style="background:${bg}" title="${day.avg != null ? day.avg + '/5' : 'no data'}"></div>
+      <div class="almanac-val">${day.avg != null ? day.avg : '—'}</div>
+    </div>`;
+  }).join('');
+
+  // Correlations
+  const corrHTML = correlations.length
+    ? correlations.map(c => `<div class="corr-row">
+        <div class="corr-label">${c.label}</div>
+        <div class="corr-delta ${c.delta > 0 ? 'pos' : 'neg'}">${c.delta > 0 ? '+' : ''}${c.delta}</div>
+        <div class="corr-n">n=${c.n}</div>
+      </div>`).join('')
+    : `<div class="dash-empty">More data needed to detect correlations.</div>`;
+
+  // AI observations
+  const obsHTML = insights.obs.length
+    ? insights.obs.map(o => {
+        const [label, ...rest] = o.split(':');
+        return `<div class="obs-card">
+          ${rest.length ? `<div class="obs-label">${label.trim()}</div><div class="obs-text">${rest.join(':').trim()}</div>` : `<div class="obs-text">${o}</div>`}
+        </div>`;
+      }).join('')
+    : '';
+
+  const blindSpotHTML = insights.blindSpot
+    ? `<div class="obs-card" style="border-color:rgba(224,112,112,0.2)">
+        <div class="obs-label" style="color:var(--error)">Blind Spot</div>
+        <div class="obs-text">${insights.blindSpot}</div>
+      </div>`
+    : '';
+
+  // Missions
+  const missionsHTML = insights.missions.length
+    ? insights.missions.map((m, i) => `<div class="mission-row">
+        <div class="mission-num">${i + 1}</div>
+        <div class="mission-text">${m}</div>
+      </div>`).join('')
+    : `<div class="dash-empty">Generating missions…</div>`;
+
+  // People
+  const visiblePeople = people
+    .filter(p => p.sessions_mentioned >= 3)
+    .sort((a, b) => (b.sessions_mentioned || 0) - (a.sessions_mentioned || 0));
+
+  const peopleHTML = visiblePeople.length
+    ? visiblePeople.map(p => {
+        const velocity = computeVelocity(p, today);
+        const initials = p.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        const lastSeen = p.last_mentioned ? _relativeDate(p.last_mentioned, today) : '';
+        const velocityLabel = velocity === 'rising' ? 'Active' : velocity === 'fading' ? 'Fading' : velocity === 'quiet' ? 'Quiet' : velocity === 'new' ? 'New' : '';
+        return `<div class="person-row">
+          <div class="person-avatar">${initials}</div>
+          <div class="person-info">
+            <div class="person-name">${p.name}</div>
+            <div class="person-rel">${p.relationship}${lastSeen ? ' · ' + lastSeen : ''}</div>
+            ${p.themes.length ? `<div class="person-themes">${p.themes.slice(0, 4).map(t => `<span class="person-theme">${t}</span>`).join('')}</div>` : ''}
+          </div>
+          <div class="person-meta">
+            ${velocityLabel ? `<div class="person-velocity ${velocity}">${velocityLabel}</div>` : ''}
+            <div class="person-sessions">${p.sessions_mentioned} sessions</div>
+          </div>
+        </div>`;
+      }).join('')
+    : `<div class="dash-empty">People appear here after 3+ sessions.</div>`;
+
+  // Evolution
+  const evoHTML = evoEntries.length
+    ? evoEntries.slice(0, 3).map(e => `<div class="evo-entry">
+        <div class="evo-date">${e.date}</div>
+        <div class="evo-phase">${e.phase || 'Untitled Phase'}</div>
+        <div class="evo-body">${e.text.split('\n\n').slice(0, 2).join('\n\n')}</div>
+      </div>`).join('')
+    : `<div class="dash-empty">Evolution entries written every 3 months.</div>`;
+
+  const sparseNote = entries.length < 7
+    ? `<div class="dash-sparse-note">Reading sharpens with more data — ${7 - entries.length} more entr${7 - entries.length === 1 ? 'y' : 'ies'} to go.</div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="dash-range">${rangeLabel}</div>
+    ${sparseNote}
+
+    <div class="dash-section">
+      ${insights.overview ? `<div class="dash-headline">"${insights.overview}"</div>` : ''}
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">Body + Mind · 14 days</div>
+      <div class="dash-radars">
+        <div class="radar-wrap">
+          <div class="radar-label">Physical</div>
+          ${makePentagonSvg(physVals, physMetrics.map(m => m.label))}
+          <div class="radar-pill">avg ${physVals.filter(Boolean).length ? (physVals.filter(Boolean).reduce((a,b)=>a+b,0)/physVals.filter(Boolean).length).toFixed(1) : '—'}</div>
+        </div>
+        <div class="radar-wrap">
+          <div class="radar-label">Mental</div>
+          ${makePentagonSvg(mentVals, mentMetrics.map(m => m.label))}
+          <div class="radar-pill">avg ${mentVals.filter(Boolean).length ? (mentVals.filter(Boolean).reduce((a,b)=>a+b,0)/mentVals.filter(Boolean).length).toFixed(1) : '—'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">Scores</div>
+      <div class="dash-groups">
+        <div class="dash-group">
+          <div class="dash-group-label">Physical</div>
+          ${physMetrics.map(metricRow).join('')}
+        </div>
+        <div class="dash-group">
+          <div class="dash-group-label">Mental</div>
+          ${mentMetrics.map(metricRow).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">Emotional Almanac · Mood by Day</div>
+      <div class="almanac-grid">${almanacCells}</div>
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">Behavioral Correlations</div>
+      ${corrHTML}
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">What the System Noticed</div>
+      ${obsHTML}
+      ${blindSpotHTML}
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">Missions</div>
+      ${missionsHTML}
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">Inner Circle</div>
+      <div class="people-grid">${peopleHTML}</div>
+    </div>
+
+    <div class="dash-section">
+      <div class="dash-section-label">Evolution</div>
+      ${evoHTML}
+    </div>
+  `;
+}
+
+// ── Dashboard: helpers ────────────────────────────────────────────────────────
+
+function _fmtDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[m - 1]} ${d}`;
+}
+
+function _relativeDate(dateStr, today) {
+  const d1 = new Date(dateStr + 'T00:00:00Z').getTime();
+  const d2 = new Date(today  + 'T00:00:00Z').getTime();
+  const days = Math.round((d2 - d1) / 86400000);
+  if (days === 0)  return 'today';
+  if (days === 1)  return 'yesterday';
+  if (days < 7)   return `${days}d ago`;
+  if (days < 30)  return `${Math.round(days / 7)}w ago`;
+  if (days < 365) return `${Math.round(days / 30)}mo ago`;
+  return `${Math.round(days / 365)}y ago`;
+}
+
+// ── Dashboard: orchestrate ────────────────────────────────────────────────────
+
+async function loadDash() {
+  const el = document.getElementById('dash-content');
+  if (!el) return;
+  el.innerHTML = '<div class="dash-loading">reading your archive…</div>';
+
+  try {
+    const [entries, patternsContent, peopleContent, evolutionContent] = await Promise.all([
+      fetchDashEntries(14),
+      fetchEntry('notes/patterns.md'),
+      fetchEntry('notes/people-profile.md'),
+      fetchEntry('notes/evolution.md'),
+    ]);
+
+    const people     = parsePeopleProfile(peopleContent);
+    const evoEntries = parseEvolutionEntries(evolutionContent);
+    const avgs       = computeDashAverages(entries);
+    const correlations = computeCorrelations(entries);
+    const lastDate   = entries.length ? entries[entries.length - 1].date : todayManila();
+
+    // Render structure immediately with computed data, then fill in AI insights
+    const insights = await generateDashInsights(avgs, correlations, patternsContent, people, entries.length, lastDate);
+    renderDash(entries, people, patternsContent, evoEntries, insights);
+  } catch(err) {
+    if (el) el.innerHTML = `<div class="dash-loading">could not load — ${err.message}</div>`;
+  }
+}

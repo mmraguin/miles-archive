@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Archive — Dashboard</title>
+<link rel="stylesheet" href="miles-archive.css">
+</head>
+<body>
+<div id="dash-app">
+
+  <div id="dash-header">
+    <div id="wordmark">
+      <div id="wm-main">Archive</div>
+      <div id="wm-date"></div>
+    </div>
+    <div id="dash-nav">
+      <a class="nav-btn" href="index.html">← chat</a>
+      <button class="nav-btn" id="dash-refresh-btn" onclick="dashRefresh()">refresh</button>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+  <div id="dash-content"></div>
+
+</div>
+<script src="miles-archive.js"></script>
+<script>initDash();</script>
+</body>
+</html>
