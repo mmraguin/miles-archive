@@ -1779,15 +1779,27 @@ async function callHaiku(systemPrompt, userMessage) {
 }
 
 function parseDashInsights(text) {
-  const get = (prefix) => {
-    const m = text.match(new RegExp(`${prefix}:\\s*(.+?)(?=\\n[A-Z_]+:|$)`, 's'));
-    return m ? m[1].trim() : '';
-  };
+  const KEYS = ['OVERVIEW', 'OBS1', 'OBS2', 'OBS3', 'MISSION1', 'MISSION2', 'MISSION3', 'BLIND_SPOT'];
+  const sections = {};
+  let currentKey = null, currentLines = [];
+
+  for (const line of text.split('\n')) {
+    const matched = KEYS.find(k => line.startsWith(k + ':'));
+    if (matched) {
+      if (currentKey) sections[currentKey] = currentLines.join(' ').trim();
+      currentKey = matched;
+      currentLines = [line.slice(matched.length + 1).trim()];
+    } else if (currentKey && line.trim()) {
+      currentLines.push(line.trim());
+    }
+  }
+  if (currentKey) sections[currentKey] = currentLines.join(' ').trim();
+
   return {
-    overview:   get('OVERVIEW'),
-    obs:        [get('OBS1'), get('OBS2'), get('OBS3')].filter(Boolean),
-    missions:   [get('MISSION1'), get('MISSION2'), get('MISSION3')].filter(Boolean),
-    blindSpot:  get('BLIND_SPOT'),
+    overview:  sections['OVERVIEW'] || '',
+    obs:       [sections['OBS1'], sections['OBS2'], sections['OBS3']].filter(Boolean),
+    missions:  [sections['MISSION1'], sections['MISSION2'], sections['MISSION3']].filter(Boolean),
+    blindSpot: sections['BLIND_SPOT'] || '',
   };
 }
 
@@ -1817,15 +1829,16 @@ async function generateDashInsights(avgs, correlations, patternsContent, people,
 
 Tone: Co-Star — dry, precise, direct, occasionally unsettling. Not warm. Not clinical. Like someone who has been watching closely and noticed things the subject hasn't. No therapy-speak. No markdown. No em-dashes. Specific, not generic.
 
-Output exactly this structure:
-OVERVIEW: [One sentence, 10-20 words. Name what defined this period specifically.]
-OBS1: [metric or pattern name]: [1-2 sentences. What the data shows. No softening.]
-OBS2: [metric or pattern name]: [1-2 sentences.]
-OBS3: [metric or pattern name]: [1-2 sentences.]
-MISSION1: [One specific imperative sentence. Actionable.]
-MISSION2: [One specific imperative sentence.]
-MISSION3: [One specific imperative sentence.]
-BLIND_SPOT: [One sentence. What's consistently low, absent, or avoided.]`;
+Output exactly 8 lines. Each line starts with a label. No blank lines. No extra sentences after the line ends.
+
+OVERVIEW: [One sentence, 10-20 words. Name what defined this period. Not generic.]
+OBS1: [Metric name]: [One or two sentences. What the number shows. No softening.]
+OBS2: [Metric name]: [One or two sentences.]
+OBS3: [Metric name]: [One or two sentences.]
+MISSION1: [One imperative sentence. The action only. Nothing else.]
+MISSION2: [One imperative sentence. The action only. Nothing else.]
+MISSION3: [One imperative sentence. The action only. Nothing else.]
+BLIND_SPOT: [One sentence. What is consistently low, absent, or avoided.]`;
 
   const userMessage = `${entryCount} entries logged in this period.
 
