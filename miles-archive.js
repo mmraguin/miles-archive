@@ -1796,6 +1796,8 @@ function parseDashInsights(text) {
 }
 
 async function generateDashInsights(avgs, correlations, patternsContent, people, entryCount, lastDate) {
+  if (entryCount < 3) return { overview: '', obs: [], missions: [], blindSpot: '' };
+
   const cacheKey = `${lastDate}_${entryCount}`;
   try {
     const cached = JSON.parse(localStorage.getItem('ar_dash_cache') || 'null');
