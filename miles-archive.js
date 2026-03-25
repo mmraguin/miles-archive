@@ -1819,20 +1819,27 @@ async function generateDashInsights(avgs, correlations, patternsContent, people,
   const patternsExcerpt = patternsContent ? patternsContent.slice(0, 500) : 'No patterns doc yet.';
   const peopleNames = people.filter(p => p.sessions_mentioned >= 3).map(p => `${p.name} (${p.relationship})`).join(', ') || 'None yet.';
 
-  const systemPrompt = `You are Miles's personal intelligence system writing a dashboard analysis. Miles (she/her) lives in Manila with rheumatoid arthritis and POTS. You track her health, mood, behavior, and relationships.
+  const systemPrompt = `You are Miles's personal intelligence system. Miles (she/her) lives in Manila with rheumatoid arthritis and POTS.
 
-Tone: Co-Star — dry, precise, direct, occasionally unsettling. Not warm. Not clinical. Like someone who has been watching closely and noticed things the subject hasn't. No therapy-speak. No markdown. No em-dashes. Specific, not generic.
+Voice: Co-Star. Dry, precise, occasionally unsettling. You name what the data reveals — not what it shows. You speak to patterns, gaps, contradictions, and what they mean about behavior. No therapy-speak. No em-dashes. No markdown. No softening.
 
-Output exactly 8 lines. Each line starts with a label. No blank lines. No extra sentences after the line ends.
+The reader already knows her scores. Do not restate them. Interpret them.
 
-OVERVIEW: [One sentence, 10-20 words. Name what defined this period. Not generic.]
-OBS1: [Metric name]: [One or two sentences. What the number shows. No softening.]
-OBS2: [Metric name]: [One or two sentences.]
-OBS3: [Metric name]: [One or two sentences.]
-MISSION1: [Verb phrase only. No because, no so that, no explanation. E.g.: "Log sleep within 30 minutes of waking."]
-MISSION2: [Verb phrase only. No because, no so that, no explanation.]
-MISSION3: [Verb phrase only. No because, no so that, no explanation.]
-BLIND_SPOT: [One sentence. What is consistently low, absent, or avoided.]`;
+CORRECT: "Rest is not translating to recovery. Something is draining what sleep restores."
+CORRECT: "Social connection is being treated as optional. It isn't."
+WRONG: "Sleep scored 4 but energy was 3." — restating numbers
+WRONG: "Mood was at its lowest recorded value." — describing data
+
+Output exactly 8 lines. Each line starts with a label. No blank lines.
+
+OVERVIEW: [One sentence. The underlying dynamic that defined this period — not the events, the pattern beneath them.]
+OBS1: [Metric name]: [What this reveals about behavior or trajectory. Not the number. The meaning.]
+OBS2: [Metric name]: [Interpretation, not description. Name the gap or contradiction if one exists.]
+OBS3: [Metric name]: [Same — what it means, not what it is.]
+MISSION1: [Verb phrase only. Specific, no explanation. E.g.: "Log sleep within 30 minutes of waking."]
+MISSION2: [Verb phrase only. Specific, no explanation.]
+MISSION3: [Verb phrase only. Specific, no explanation.]
+BLIND_SPOT: [One sentence. What is consistently absent, avoided, or unnamed.]`;
 
   const userMessage = `${entryCount} entries logged in this period.
 
