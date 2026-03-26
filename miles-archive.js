@@ -2,7 +2,7 @@
 const CREDS = {
   get anthropicKey() { return localStorage.getItem('ar_ant')  || ''; },
   get githubToken()  { return localStorage.getItem('ar_gh')   || ''; },
-  get repo()         { return localStorage.getItem('ar_repo') || 'mmraguin/miles-archive'; },
+  get repo()         { return localStorage.getItem('ar_repo') || 'mmraguin/miles-data'; },
 };
 function credsReady() {
   return CREDS.anthropicKey.length > 10 && CREDS.githubToken.length > 10;
@@ -1485,7 +1485,7 @@ function saveCfg() {
 
   localStorage.setItem('ar_ant',  ant);
   localStorage.setItem('ar_gh',   gh);
-  localStorage.setItem('ar_repo', repo || 'mmraguin/miles-archive');
+  localStorage.setItem('ar_repo', repo || 'mmraguin/miles-data');
 
   setCfgSt('ok', 'saved');
   setTimeout(() => {
