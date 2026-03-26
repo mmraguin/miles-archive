@@ -133,6 +133,11 @@ function buildSysPrompt() {
     ? `ACCUMULATED PATTERNS\n${S.patterns}\n\nThis is your working memory across sessions. Use it — don't reference the doc explicitly, just use what you know. When today confirms or breaks a pattern, that's signal. At session end, after the entry, you can update this doc if something notable emerged — see PATTERNS DOC UPDATES below.`
     : '';
 
+  // ── Section: Chat insights (fetched from notes/chat-insights.md)
+  const chatInsightsContext = S.chatInsights
+    ? `CHAT INSIGHTS\n${S.chatInsights}\n\nRunning record of named observations, open threads, and reflective insights across sessions. Use as background — don't reference the doc explicitly.`
+    : '';
+
   // ── Section: Recent entries (last 3 days, compressed: YAML + first Narrative paragraph)
   const recentContext = S.recentEntries.length
     ? 'RECENT ENTRIES\n' + S.recentEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n')
@@ -394,6 +399,42 @@ When updating, also clean the doc: mark resolved patterns as resolved, remove De
 
 Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
 
+  // ── Section: Chat insights update instructions
+  const chatInsightsUpdate = `CHAT INSIGHTS UPDATES
+If this session surfaced a named observation, a realization, or a thread worth returning to — or Miles indicated something should be noted (infer intent from context, no special syntax required) — output the complete updated notes/chat-insights.md wrapped in markers:
+
+<<<CHAT_INSIGHTS_START>>>
+# Chat Insights
+
+*Observations, named experiences, and threads worth returning to — captured in conversation.*
+
+*Last updated: ${date}*
+
+---
+
+## Open Threads
+
+- [short label](#section-name) — one-line description
+
+---
+
+## Section Name
+
+**${date}**
+Narrative observation in paragraph form.
+
+*Watch: something flagged for follow-up.*
+
+---
+<<<CHAT_INSIGHTS_END>>>
+
+Rules:
+- Append new entries to the correct existing section; create a new ## Section if none fit
+- Preserve all prior entries verbatim
+- Add a line to ## Open Threads if the entry has a Watch or Return to note; remove if a prior thread was resolved this session
+- UPDATE when: a named experience surfaces, a realization or shift is articulated, Miles signals something is worth keeping
+- DO NOT update: every session, for passing comments, for things already captured`;
+
   // ── Section: People profile context
   const peopleContext = S.peopleProfile
     ? `PEOPLE PROFILE\n${S.peopleProfile}\n\nRunning record of people in Miles's life. Use to recognize names, relationships, recurring themes. Don't reference the doc explicitly.`
@@ -449,7 +490,7 @@ Skip if: routine numbers session, Miles is clearly exhausted or in brief mode, n
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, peopleContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, peopleUpdate, evolutionUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, chatInsightsUpdate, peopleUpdate, evolutionUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -645,6 +686,13 @@ function extractEvolution(txt) {
   return txt.slice(s + 21, e).trim();
 }
 
+function extractChatInsights(txt) {
+  const s = txt.indexOf('<<<CHAT_INSIGHTS_START>>>');
+  const e = txt.indexOf('<<<CHAT_INSIGHTS_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 25, e).trim();
+}
+
 function detectType(reply) {
   // Check the entry content (not the reply preamble) to avoid misfiling
   const entry = extractEntry(reply) || reply;
@@ -824,7 +872,9 @@ function dismissPatterns() {
   S.pendingPatterns = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
-  if (S._queuedPeople) {
+  if (S._queuedInsights) {
+    const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
+  } else if (S._queuedPeople) {
     const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
@@ -869,7 +919,9 @@ async function savePatterns() {
     setTimeout(() => {
       document.getElementById('pat-bar').classList.remove('show');
       document.getElementById('pat-st').className = '';
-      if (S._queuedPeople) {
+      if (S._queuedInsights) {
+        const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
+      } else if (S._queuedPeople) {
         const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
@@ -877,6 +929,80 @@ async function savePatterns() {
     }, 2400);
   } catch(err) {
     setPatSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── Chat insights save ────────────────────────────────────────────────────────
+function setInsightsSt(type, txt) {
+  const e = document.getElementById('insights-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showInsightsBar(content) {
+  S.pendingInsights = content;
+  document.getElementById('insights-go').disabled = false;
+  document.getElementById('insights-st').className = '';
+  document.getElementById('insights-bar').classList.add('show');
+}
+
+function dismissInsights() {
+  S.pendingInsights = null;
+  document.getElementById('insights-bar').classList.remove('show');
+  document.getElementById('insights-st').className = '';
+  if (S._queuedPeople) {
+    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+  } else if (S._queuedEvolution) {
+    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  }
+}
+
+async function saveInsights() {
+  if (!S.pendingInsights) return;
+  const btn = document.getElementById('insights-go');
+  btn.disabled = true;
+  setInsightsSt('info', 'writing…');
+  try {
+    const path = 'notes/chat-insights.md';
+    const { sha } = await getFileInfo(path);
+    const body = {
+      message: 'insights: update notes/chat-insights.md',
+      content: b64Encode(S.pendingInsights),
+    };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${CREDS.githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.chatInsights = S.pendingInsights;
+    setInsightsSt('ok', 'saved');
+    addSys('insights updated → notes/chat-insights.md');
+    S.pendingInsights = null;
+    setTimeout(() => {
+      document.getElementById('insights-bar').classList.remove('show');
+      document.getElementById('insights-st').className = '';
+      if (S._queuedPeople) {
+        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+      } else if (S._queuedEvolution) {
+        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      }
+    }, 2400);
+  } catch(err) {
+    setInsightsSt('err', friendlyError(err));
     btn.disabled = false;
   }
 }
@@ -1066,32 +1192,38 @@ async function sendMsg() {
     const entry     = extractEntry(reply);
     const state     = extractState(reply);
     const patterns  = extractPatterns(reply);
+    const insights  = extractChatInsights(reply);
     const people    = extractPeople(reply);
     const evolution = extractEvolution(reply);
     const deepFetch = reply.includes('<<<FETCH_DEEP>>>');
     // Strip all markers from displayed text
     let disp = reply;
-    if (entry)     disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
-    if (state)     disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
-    if (patterns)  disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
-    if (people)    disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
+    if (entry)    disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
+    if (state)    disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
+    if (patterns) disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
+    if (insights) disp = disp.replace(/<<<CHAT_INSIGHTS_START>>>[\s\S]*?<<<CHAT_INSIGHTS_END>>>/g, '').trim();
+    if (people)   disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
     if (evolution) disp = disp.replace(/<<<EVOLUTION_START>>>[\s\S]*?<<<EVOLUTION_END>>>/g, '').trim();
     disp = disp.replace(/<<<FETCH_DEEP>>>/g, '').trim();
     addMsg('assistant', disp || 'Done.');
     S.messages.push({ role: 'assistant', content: reply });
     saveDraft();
     if (state) showStateBar(state);
-    // Queue order: entry → patterns → people → evolution
+    // Queue order: entry → patterns → insights → people → evolution
     if (patterns) {
       if (entry) S._queuedPatterns = patterns;
       else showPatBar(patterns);
     }
+    if (insights) {
+      if (entry || patterns) S._queuedInsights = insights;
+      else showInsightsBar(insights);
+    }
     if (people) {
-      if (entry || patterns) S._queuedPeople = people;
+      if (entry || patterns || insights) S._queuedPeople = people;
       else showPeopleBar(people);
     }
     if (evolution) {
-      if (entry || patterns || people) S._queuedEvolution = evolution;
+      if (entry || patterns || insights || people) S._queuedEvolution = evolution;
       else showEvoBar(evolution);
     }
     if (entry) showSaveBar(entry, detectType(reply));
@@ -1134,11 +1266,14 @@ function _clearAndStart() {
   S.messages = []; S.pendingEntry = null; S.pendingPath = null; S.pendingState = null;
   S.brief = false; S.existingEntry = null; S.recentEntries = []; S.stateOfMiles = null;
   S.goals = null; S.patterns = null; S.pendingPatterns = null;
+  S.chatInsights = null; S.pendingInsights = null; S._queuedInsights = null;
   S.deepFetched = false; S._queuedPatterns = null;
   S.peopleProfile = null; S.pendingPeople = null; S._queuedPeople = null;
   S.evolution = null; S.pendingEvolution = null; S.evoTrigger = false; S._queuedEvolution = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
+  document.getElementById('insights-bar').classList.remove('show');
+  document.getElementById('insights-st').className = '';
   document.getElementById('state-bar').classList.remove('show');
   document.getElementById('state-st').className = '';
   document.getElementById('people-bar').classList.remove('show');
@@ -1200,6 +1335,7 @@ function compressEntry(content) {
 
 function fetchGoals()         { return fetchEntry('notes/goals-summary.md'); }
 function fetchPatterns()      { return fetchEntry('notes/patterns.md'); }
+function fetchChatInsights()  { return fetchEntry('notes/chat-insights.md'); }
 function fetchPeopleProfile() { return fetchEntry('notes/people-profile.md'); }
 function fetchEvolution()     { return fetchEntry('notes/evolution.md'); }
 
@@ -1309,11 +1445,12 @@ function buildGraymatterTrend(entries) {
 
 // ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
-  const [recentEntries, stateOfMiles, goals, patterns, peopleProfile, evolution] = await Promise.all([
+  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, evolution] = await Promise.all([
     fetchRecentEntries(),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
+    fetchChatInsights(),
     fetchPeopleProfile(),
     fetchEvolution(),
   ]);
@@ -1321,6 +1458,7 @@ async function loadSessionContext() {
   S.stateOfMiles  = stateOfMiles;
   S.goals         = goals;
   S.patterns      = patterns;
+  S.chatInsights  = chatInsights;
   S.peopleProfile = peopleProfile;
   S.evolution     = evolution;
   S.evoTrigger    = _computeEvoTrigger(evolution);
@@ -1337,13 +1475,14 @@ async function startSess() {
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
-  // Fetch today's entry + recent days + state doc + goals + patterns + people + evolution in parallel
-  const [existing, recentEntries, stateOfMiles, goals, patterns, peopleProfile, evolution] = await Promise.all([
+  // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution in parallel
+  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, evolution] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
+    fetchChatInsights(),
     fetchPeopleProfile(),
     fetchEvolution(),
   ]);
@@ -1352,6 +1491,7 @@ async function startSess() {
   S.stateOfMiles   = stateOfMiles;
   S.goals          = goals;
   S.patterns       = patterns;
+  S.chatInsights   = chatInsights;
   S.peopleProfile  = peopleProfile;
   S.evolution      = evolution;
   S.evoTrigger     = _computeEvoTrigger(evolution);

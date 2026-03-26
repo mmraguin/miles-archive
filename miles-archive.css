@@ -248,6 +248,45 @@ html, body {
 #pat-st.err  { color: var(--error); }
 #pat-st.info { color: var(--text-2); }
 
+/* ── Insights bar ── */
+#insights-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#insights-bar.show { display: flex; }
+
+#insights-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#insights-lbl { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #a78bfa; flex-shrink: 0; }
+#insights-path { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#insights-row  { display: flex; align-items: center; gap: 14px; }
+
+#insights-go {
+  background: none; border: 1px solid #a78bfa; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  color: #a78bfa; padding: 9px 22px; border-radius: 30px;
+  transition: opacity 0.18s; line-height: 1;
+}
+#insights-go:hover    { opacity: 0.82; }
+#insights-go:disabled { opacity: 0.2; cursor: not-allowed; }
+
+#insights-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: color 0.18s;
+}
+#insights-no:hover { color: var(--text-2); }
+
+#insights-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#insights-st.show { display: block; }
+#insights-st.ok   { color: var(--success); }
+#insights-st.err  { color: var(--error); }
+#insights-st.info { color: var(--text-2); }
+
 /* ── State bar ── */
 #state-bar {
   display: none; flex-direction: column; gap: 10px;

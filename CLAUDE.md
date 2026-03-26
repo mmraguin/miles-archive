@@ -1,6 +1,6 @@
 # miles-archive — Project Reference
 
-*Last updated: March 25, 2026. Dashboard + people profile + evolution tracking live.*
+*Last updated: March 26, 2026. Dashboard + people profile + evolution tracking live. Chat insights save target added.*
 
 ---
 
@@ -124,8 +124,11 @@ const S = {
   goals:            null,  // fetched from notes/goals-summary.md
   patterns:         null,  // fetched from notes/patterns.md
   pendingPatterns:  null,  // patterns doc update pending save
+  chatInsights:     null,  // fetched from notes/chat-insights.md
+  pendingInsights:  null,  // chat insights update pending save
   deepFetched:      false, // whether FETCH_DEEP has fired this session
   _queuedPatterns:  null,  // patterns update queued to show after entry bar clears
+  _queuedInsights:  null,  // insights update queued to show after patterns bar clears
   peopleProfile:    null,  // fetched from notes/people-profile.md
   pendingPeople:    null,  // people profile update pending save
   evolution:        null,  // fetched from notes/evolution.md
@@ -143,7 +146,7 @@ const S = {
 `buildSysPrompt()` joins sections with `\n\n`, filtered for truthiness:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → peopleContext → recentContext → graymatterTrend → trendAwareness → fetchDeep → coaching → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → peopleUpdate → evolutionUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleContext → recentContext → graymatterTrend → trendAwareness → fetchDeep → coaching → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → chatInsightsUpdate → peopleUpdate → evolutionUpdate → misc
 ```
 
 `stateDoc` is fetched from `notes/state-of-miles.md` at session start. Update whenever health context changes — diagnoses, meds, labs, open threads. Sat/Sun medication reminders injected here.
@@ -151,6 +154,8 @@ identity → context → stateDoc → goalsContext → patternsContext → peopl
 `goalsContext` is fetched from `notes/goals-summary.md` — 3–5 line active goals summary. Not the full goals doc. Update when priorities shift. Claude references this during conversation to surface goal connections and flag stagnation. Suppressed on hard days / health flares.
 
 `patternsContext` is fetched from `notes/patterns.md` — Claude's accumulated observations across sessions. Injected as context; Claude uses it without referencing it directly. Updated by Claude via `<<<PATTERNS_START>>>` / `<<<PATTERNS_END>>>` markers at session end. Miles confirms before saving.
+
+`chatInsightsContext` is fetched from `notes/chat-insights.md` — named observations, open threads, and reflective insights captured across sessions. Claude updates it via `<<<CHAT_INSIGHTS_START>>>` / `<<<CHAT_INSIGHTS_END>>>` markers when a named experience surfaces, a realization is articulated, or Miles signals something is worth keeping. Claude infers intent — no special syntax required. Queued to save after patterns bar in the cascade.
 
 `peopleContext` is fetched from `notes/people-profile.md` — YAML ledger of people in Miles's life. Claude updates it via `<<<PEOPLE_START>>>` / `<<<PEOPLE_END>>>` markers when named people are mentioned. Queued to save after patterns bar. Dashboard reads this for the Inner Circle section.
 
@@ -208,12 +213,13 @@ Entry output (inside `<<<ENTRY_START>>>` / `<<<ENTRY_END>>>`) still uses markdow
 Save bars queue in order. Each bar shows only after the previous is saved or dismissed:
 
 ```
-entry → patterns → people → evolution
+entry → patterns → insights → people → evolution
 ```
 
 - Entry bar: always first. `showSaveBar()` → `saveEntry()` / `dismissSave()`
 - Patterns bar: queued via `S._queuedPatterns` if entry is also present
-- People bar: queued via `S._queuedPeople` if entry or patterns is present
+- Insights bar: queued via `S._queuedInsights` if entry or patterns is present; lavender (`#a78bfa`) accent
+- People bar: queued via `S._queuedPeople` if entry, patterns, or insights is present
 - Evolution bar: queued via `S._queuedEvolution` — always last
 
 If only one type is present (e.g. people with no entry), it shows immediately.
@@ -353,6 +359,7 @@ miles-data/
     ├── state-of-miles.md            ← health context
     ├── goals-summary.md             ← active goals (3–5 lines, Claude reads this)
     ├── patterns.md                  ← accumulated patterns (Claude maintains)
+    ├── chat-insights.md             ← named observations + open threads (Claude maintains)
     ├── people-profile.md            ← people YAML ledger (Claude maintains, created on first write)
     └── evolution.md                 ← quarterly life phase entries (Claude maintains, created on first write)
 ```
