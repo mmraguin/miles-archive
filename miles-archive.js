@@ -401,7 +401,9 @@ Causation note: name what the data shows, not what caused it. "Energy tends to b
 
   // ── Section: Chat insights update instructions
   const chatInsightsUpdate = `CHAT INSIGHTS UPDATES
-If this session surfaced a named observation, a realization, or a thread worth returning to — or Miles indicated something should be noted (infer intent from context, no special syntax required) — output the complete updated notes/chat-insights.md wrapped in markers:
+If this session surfaced a named observation, a realization, or a thread worth returning to — output the complete updated notes/chat-insights.md wrapped in markers.
+
+EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "take note", "remember this", "add this to insights", "log this", or otherwise directly asks you to record something — treat this as an unambiguous instruction to output the markers. Do not respond conversationally and skip the markers. Output the markers.
 
 <<<CHAT_INSIGHTS_START>>>
 # Chat Insights
