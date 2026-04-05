@@ -11,6 +11,8 @@
   --text-3:      #575250;
   --teal:        #4ecdb4;
   --teal-soft:   rgba(78,205,180,0.13);
+  --rose:        #fb7185;
+  --rose-soft:   rgba(251,113,133,0.13);
   --user-bg:     #161616;
   --user-border: #242424;
   --success:     #4ecdb4;
@@ -247,6 +249,45 @@ html, body {
 #pat-st.ok   { color: var(--success); }
 #pat-st.err  { color: var(--error); }
 #pat-st.info { color: var(--text-2); }
+
+/* ── Goals summary bar ── */
+#goals-summary-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#goals-summary-bar.show { display: flex; }
+
+#goals-summary-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#goals-summary-lbl { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--teal); flex-shrink: 0; }
+#goals-summary-path { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#goals-summary-row { display: flex; align-items: center; gap: 14px; }
+
+#goals-summary-go {
+  background: none; border: 1px solid var(--teal); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  transition: opacity 0.18s; line-height: 1;
+}
+#goals-summary-go:hover    { opacity: 0.82; }
+#goals-summary-go:disabled { opacity: 0.2; cursor: not-allowed; }
+
+#goals-summary-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: color 0.18s;
+}
+#goals-summary-no:hover { color: var(--text-2); }
+
+#goals-summary-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#goals-summary-st.show { display: block; }
+#goals-summary-st.ok   { color: var(--success); }
+#goals-summary-st.err  { color: var(--error); }
+#goals-summary-st.info { color: var(--text-2); }
 
 /* ── Insights bar ── */
 #insights-bar {
@@ -578,6 +619,39 @@ html, body {
 #people-st.err { color: var(--error); }
 #people-st.info { color: var(--text-2); }
 
+/* ── People notes bar ── */
+#people-notes-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#people-notes-bar.show { display: flex; }
+#people-notes-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#people-notes-lbl { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--rose); flex-shrink: 0; }
+#people-notes-path { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#people-notes-row { display: flex; align-items: center; gap: 14px; }
+#people-notes-go {
+  background: none; border: 1px solid var(--rose); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  color: var(--rose); padding: 9px 22px; border-radius: 30px;
+  transition: opacity 0.18s; line-height: 1;
+}
+#people-notes-go:hover { opacity: 0.82; }
+#people-notes-go:disabled { opacity: 0.2; cursor: not-allowed; }
+#people-notes-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0; letter-spacing: 0.1em; text-transform: uppercase; transition: color 0.18s;
+}
+#people-notes-no:hover { color: var(--text-2); }
+#people-notes-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#people-notes-st.show { display: block; }
+#people-notes-st.ok  { color: var(--success); }
+#people-notes-st.err { color: var(--error); }
+#people-notes-st.info { color: var(--text-2); }
+
 /* ── Evolution bar ── */
 #evo-bar {
   display: none; flex-direction: column; gap: 10px;
@@ -610,6 +684,47 @@ html, body {
 #evo-st.ok  { color: var(--success); }
 #evo-st.err { color: var(--error); }
 #evo-st.info { color: var(--text-2); }
+
+/* ── Review bar ── */
+#review-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#review-bar.show { display: flex; }
+
+#review-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#review-lbl { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: #f59e0b; flex-shrink: 0; }
+#review-path { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#review-row { display: flex; align-items: center; gap: 14px; }
+
+#review-go {
+  background: none; border: 1px solid #f59e0b; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  color: #f59e0b; padding: 9px 22px; border-radius: 30px;
+  transition: opacity 0.18s; line-height: 1;
+}
+#review-go:hover    { opacity: 0.82; }
+#review-go:disabled { opacity: 0.2; cursor: not-allowed; }
+
+#review-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: color 0.18s;
+}
+#review-no:hover { color: var(--text-2); }
+
+#review-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#review-st.show { display: block; }
+#review-st.ok   { color: var(--success); }
+#review-st.err  { color: var(--error); }
+#review-st.info { color: var(--text-2); }
+
+#review-btn.on { color: #f59e0b; border-color: #f59e0b; background: rgba(245,158,11,0.08); }
 
 /* ── Dashboard ── */
 #dash-app {
@@ -652,7 +767,12 @@ html, body {
 .dash-section-label {
   font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400;
   letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3);
-  margin-bottom: 16px;
+  margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+}
+.dash-section-meta {
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  letter-spacing: 0.04em; text-transform: none; color: var(--text-4, var(--text-3));
+  opacity: 0.6;
 }
 
 .dash-range {

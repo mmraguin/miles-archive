@@ -16,6 +16,7 @@
     </div>
     <div id="nav">
       <button class="nav-btn" id="brief-btn" onclick="toggleBrief()">brief</button>
+      <button class="nav-btn" id="review-btn" onclick="initReviewMode()">review</button>
       <button class="nav-btn" onclick="openFetch()">fetch</button>
       <button class="nav-btn" onclick="newSess()">new</button>
       <a class="nav-btn" href="dashboard.html">dash</a>
@@ -40,6 +41,18 @@
       <button id="pat-go" onclick="savePatterns()">Save to GitHub →</button>
       <button id="pat-no" onclick="dismissPatterns()">discard</button>
       <span id="pat-st"></span>
+    </div>
+  </div>
+
+  <div id="goals-summary-bar">
+    <div id="goals-summary-top">
+      <span id="goals-summary-lbl">Goals summary update</span>
+      <span id="goals-summary-path">notes/goals-summary.md</span>
+    </div>
+    <div id="goals-summary-row">
+      <button id="goals-summary-go" onclick="saveGoalsSummary()">Save to GitHub →</button>
+      <button id="goals-summary-no" onclick="dismissGoalsSummary()">discard</button>
+      <span id="goals-summary-st"></span>
     </div>
   </div>
 
@@ -79,6 +92,18 @@
     </div>
   </div>
 
+  <div id="people-notes-bar">
+    <div id="people-notes-top">
+      <span id="people-notes-lbl">People notes update</span>
+      <span id="people-notes-path">notes/people-notes.md</span>
+    </div>
+    <div id="people-notes-row">
+      <button id="people-notes-go" onclick="savePeopleNotes()">Save to GitHub →</button>
+      <button id="people-notes-no" onclick="dismissPeopleNotes()">discard</button>
+      <span id="people-notes-st"></span>
+    </div>
+  </div>
+
   <div id="evo-bar">
     <div id="evo-top">
       <span id="evo-lbl">Evolution entry</span>
@@ -88,6 +113,18 @@
       <button id="evo-go" onclick="saveEvolution()">Save to GitHub →</button>
       <button id="evo-no" onclick="dismissEvolution()">discard</button>
       <span id="evo-st"></span>
+    </div>
+  </div>
+
+  <div id="review-bar">
+    <div id="review-top">
+      <span id="review-lbl">Review ready</span>
+      <span id="review-path">goals/review-log.md</span>
+    </div>
+    <div id="review-row">
+      <button id="review-go" onclick="saveReview()">Save to GitHub →</button>
+      <button id="review-no" onclick="dismissReview()">discard</button>
+      <span id="review-st"></span>
     </div>
   </div>
 

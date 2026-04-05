@@ -23,17 +23,26 @@ const S = {
   stateOfMiles:     null,  // fetched from notes/state-of-miles.md
   pendingState:     null,  // state doc update pending save
   goals:            null,  // fetched from notes/goals-summary.md
-  patterns:         null,  // fetched from notes/patterns.md
-  pendingPatterns:  null,  // patterns doc update pending save
-  deepFetched:      false, // whether deep context fetch has fired this session
-  _queuedPatterns:  null,  // patterns update queued to show after entry bar clears
-  peopleProfile:    null,  // fetched from notes/people-profile.md
-  pendingPeople:    null,  // people profile update pending save
-  evolution:        null,  // fetched from notes/evolution.md
-  pendingEvolution: null,  // evolution update pending save
-  evoTrigger:       false, // whether evolution entry should be prompted this session
-  _queuedPeople:    null,  // people update queued to show after patterns bar clears
-  _queuedEvolution: null,  // evolution update queued to show after people bar clears
+  patterns:           null,  // fetched from notes/patterns.md
+  pendingPatterns:    null,  // patterns doc update pending save
+  pendingGoalsSummary: null, // goals summary update pending save
+  deepFetched:        false, // whether deep context fetch has fired this session
+  _queuedPatterns:    null,  // patterns update queued to show after entry bar clears
+  _queuedGoalsSummary: null, // goals summary queued to show after patterns bar clears
+  peopleProfile:      null,  // fetched from notes/people-profile.md
+  pendingPeople:      null,  // people profile update pending save
+  peopleNotes:        null,  // fetched from notes/people-notes.md
+  pendingPeopleNotes: null,  // people notes update pending save
+  evolution:          null,  // fetched from notes/evolution.md
+  pendingEvolution:   null,  // evolution update pending save
+  evoTrigger:         false, // whether evolution entry should be prompted this session
+  _queuedPeople:      null,  // people update queued to show after insights bar clears
+  _queuedPeopleNotes: null,  // people notes update queued to show after people bar clears
+  _queuedEvolution:   null,  // evolution update queued to show after people-notes bar clears
+  reviewMode:         false, // whether current session is a review session
+  pendingReview:      null,  // review content pending save
+  existingReview:     null,  // current review-log.md content (for incomplete merge)
+  reviewLog:          null,  // fetched review-log.md (for overdue check)
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -44,16 +53,16 @@ function todayManila() {
   }).format(new Date());
 }
 
-function dowManila() {
+function dowManila(dt = new Date()) {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila', weekday: 'long',
-  }).format(new Date());
+  }).format(dt);
 }
 
-function dayIndexManila() {
+function dayIndexManila(dt = new Date()) {
   const abbr = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Manila', weekday: 'short',
-  }).format(new Date());
+  }).format(dt);
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(abbr);
 }
 
@@ -437,6 +446,11 @@ Rules:
 - UPDATE when: a named experience surfaces, a realization or shift is articulated, Miles signals something is worth keeping
 - DO NOT update: every session, for passing comments, for things already captured`;
 
+  // ── Section: People notes context (not injected in brief mode)
+  const peopleNotesContext = (!S.brief && S.peopleNotes)
+    ? `PEOPLE NOTES\n${S.peopleNotes}\n\nRicher narratives for people in Miles's life — how relationships have evolved, emotional texture, recurring dynamics. Use as texture, don't reference the doc explicitly.`
+    : '';
+
   // ── Section: People profile context
   const peopleContext = S.peopleProfile
     ? `PEOPLE PROFILE\n${S.peopleProfile}\n\nRunning record of people in Miles's life. Use to recognize names, relationships, recurring themes. Don't reference the doc explicitly.`
@@ -467,11 +481,72 @@ Rules:
 - Output the full file preserving all existing entries
 - Only emit if at least one named person was mentioned today`;
 
+  // ── Section: People notes update instructions (suppressed in brief mode)
+  const peopleNotesUpdate = S.brief ? '' : `PEOPLE NOTES UPDATES
+When a named person has a notable moment this session — not every routine mention, but something that shifts the relationship, reveals a pattern, or is worth remembering — output the complete updated notes/people-notes.md:
+
+<<<PEOPLE_NOTES_START>>>
+---
+last_updated: ${date}
+---
+
+## [Name]
+*Relationship: [type] | Last updated: ${date}*
+
+[Narrative paragraphs — how the relationship has evolved, recurring themes, emotional texture]
+
+---
+<<<PEOPLE_NOTES_END>>>
+
+Rules:
+- Notable moments only: a revelation, a shift, a significant exchange — not routine mentions
+- Preserve all prior entries verbatim; update the relevant ## [Name] section if they appeared notably this session
+- Create a new ## [Name] section if this person has no prior entry
+- Update the Last updated date for any section touched
+- Output the full file with all existing entries
+- Do not emit in brief mode or for passing mentions`;
+
+  // ── Section: Review overdue note (daily mode only, not brief)
+  const lastReviewDate = parseLastReviewDate(S.reviewLog);
+  const daysSinceReview = lastReviewDate
+    ? Math.floor((Date.now() - new Date(lastReviewDate + 'T00:00:00Z')) / 86400000)
+    : null;
+  const reviewOverdue = (!S.brief && daysSinceReview !== null && daysSinceReview > 14)
+    ? `REVIEW OVERDUE: Last review was ${daysSinceReview} days ago. If it fits naturally in the conversation — not as an announcement — mention that a review might be worth doing. One sentence, then move on. Don't make it a big deal.`
+    : '';
+
+  // ── Section: Goals summary update instructions (suppressed in brief mode)
+  const goalsSummaryUpdate = S.brief ? '' : `GOALS SUMMARY UPDATES
+Update notes/goals-summary.md conservatively — this is a correction, not a routine update.
+
+Trigger only if both of these are true:
+1. The current summary was last updated more than 14 days ago.
+2. At least one of: a listed goal has shown no movement for 8+ weeks; or a new focus has emerged consistently across 4+ weeks of entries that isn't reflected in the current summary.
+
+Never trigger: if the summary was updated in the last 14 days; if today's session is routine; if nothing in today's session or recent patterns contradicts what's already in the summary.
+
+When triggering, output the complete updated file wrapped in markers:
+
+<<<GOALS_SUMMARY_START>>>
+# Active Goals Summary
+
+*Last updated: ${date}*
+*Full goals: goals/current.md*
+
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+<<<GOALS_SUMMARY_END>>>
+
+Format: 4–5 lines. Each line is one active focus — specific enough to recognize when a journal entry connects or contradicts. Not a values statement. What's actually in motion right now.`;
+
   // ── Section: Evolution update (only injected when triggered)
   const evolutionUpdate = S.evoTrigger ? `EVOLUTION ENTRY
 ${S.evolution ? `Last evolution: ${parseEvolutionDate(S.evolution)}. ${Math.floor((Date.now() - new Date(parseEvolutionDate(S.evolution) + 'T00:00:00Z')) / 86400000)} days ago.` : 'No evolution entry exists yet.'}
 
-At session end, after all other updates, if this session had enough substance, write a life phase summary:
+At session end, after all other updates, if this session had enough substance, write a life phase summary. Draw on ACCUMULATED PATTERNS, PEOPLE NOTES, and STATE OF MILES — not just today's conversation. The entry should reflect a broader arc:
 
 <<<EVOLUTION_START>>>
 ---
@@ -492,9 +567,215 @@ Skip if: routine numbers session, Miles is clearly exhausted or in brief mode, n
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, chatInsightsUpdate, peopleUpdate, evolutionUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, reviewOverdue, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
+}
+
+// ── Review mode system prompt ─────────────────────────────────────────────────
+function buildReviewPrompt(goalsFull, incompleteBlock) {
+  const { sessionDate: date, sessionDow: dow } = S;
+
+  const identity = `You are Miles's life coach — running a structured life review, not a daily journal session. Your job: evaluate where she is against her goals, surface what's working and what isn't, name gaps and wins clearly, and suggest next steps. Evaluative and coaching-forward. Not therapeutic, not journalistic.`;
+
+  const context = `TODAY: ${dow}, ${date} (GMT+8, Manila).`;
+
+  const stateDoc = S.stateOfMiles
+    ? `STATE OF MILES\n${S.stateOfMiles}`
+    : '';
+
+  const goalsFull_ = goalsFull
+    ? `GOALS (FULL)\n${goalsFull}`
+    : '';
+
+  const goalsSummary = S.goals
+    ? `GOALS SUMMARY\n${S.goals}`
+    : '';
+
+  const patterns = S.patterns
+    ? `ACCUMULATED PATTERNS\n${S.patterns}`
+    : '';
+
+  const chatInsights = S.chatInsights
+    ? `CHAT INSIGHTS\n${S.chatInsights}`
+    : '';
+
+  const peopleNotes = S.peopleNotes
+    ? `PEOPLE NOTES\n${S.peopleNotes}`
+    : '';
+
+  const evolution = S.evolution
+    ? `EVOLUTION\n${S.evolution}`
+    : '';
+
+  const recentContext = S.recentEntries.length
+    ? 'RECENT ENTRIES (compressed)\n' + S.recentEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n')
+    : '';
+
+  const incompleteCtx = incompleteBlock
+    ? `INCOMPLETE REVIEW (continue from here)\nA previous review was started but not finished. Continue it — pick up where it left off, complete the remaining sections, and output the full merged version in the markers. It will overwrite the incomplete entry.\n\nPrevious content:\n${incompleteBlock}`
+    : '';
+
+  const reviewInstructions = `REVIEW INSTRUCTIONS
+Adapt to Miles's signal at the start of the session:
+- "Quick check" / "just a brief look" → check-in format (shorter, less structured)
+- Full intent or no signal → full structured pass
+
+Depth: read the conversation, ask clarifying questions if needed, but move toward the output — this is a coaching session, not an interview.
+
+When ready, output the review wrapped in markers:
+
+<<<REVIEW_START>>>
+## ${date}
+**Status: complete**
+**Type: full**
+
+### Alignment
+[How well is Miles tracking against her stated goals? Be specific — name goals that are moving and ones that aren't.]
+
+### Gaps & Challenges
+[What isn't working? What keeps coming up? Be direct.]
+
+### Wins
+[What has actually moved? Name specifics from patterns and recent entries.]
+
+### Opportunities & Next Steps
+[Concrete actions, not platitudes. What's the next right move?]
+
+### New Goals / Habits to Consider
+[If patterns or conversation surfaced something worth adding, name it. Otherwise omit this section.]
+<<<REVIEW_END>>>
+
+For check-in format, use Type: check-in and keep sections brief.
+If session is cut short, use Status: incomplete — the save bar will still appear.
+
+VOICE: Same directness as daily sessions. Second-person, declarative, no hedging. Sound like someone who actually knows her.`;
+
+  const goalsSummaryUpdate = `GOALS SUMMARY UPDATES
+At the end of every review session, output an updated goals summary — this is the natural capstone of a review. Always fire this.
+
+<<<GOALS_SUMMARY_START>>>
+# Active Goals Summary
+
+*Last updated: ${date}*
+*Full goals: goals/current.md*
+
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+- [Life zone]: [specific outcome or milestone actively in progress]
+<<<GOALS_SUMMARY_END>>>`;
+
+  const peopleNotesUpdate = `PEOPLE NOTES UPDATES
+If relationship patterns surfaced during the review, output the complete updated notes/people-notes.md:
+
+<<<PEOPLE_NOTES_START>>>
+---
+last_updated: ${date}
+---
+
+## [Name]
+*Relationship: [type] | Last updated: ${date}*
+
+[Narrative — how the relationship has evolved, recurring themes, emotional texture]
+
+---
+<<<PEOPLE_NOTES_END>>>
+
+Only emit if relationship patterns genuinely surfaced. Preserve all prior entries verbatim.`;
+
+  const peopleUpdate = `PEOPLE PROFILE UPDATES
+If named people were mentioned, output the complete updated people profile:
+
+<<<PEOPLE_START>>>
+---
+last_updated: ${date}
+---
+people:
+  - name: [Name]
+    relationship: [type]
+    type: [regular/medical/professional]
+    sessions_mentioned: [N]
+    last_mentioned: ${date}
+    themes: [theme1, theme2]
+<<<PEOPLE_END>>>`;
+
+  const lastEvoDate = parseEvolutionDate(S.evolution);
+  const daysSinceEvo = lastEvoDate
+    ? Math.floor((Date.now() - new Date(lastEvoDate + 'T00:00:00Z')) / 86400000)
+    : null;
+  const evolutionSuggestion = (daysSinceEvo === null || daysSinceEvo >= 90)
+    ? `EVOLUTION SUGGESTION
+${daysSinceEvo === null ? 'No evolution entries exist yet.' : `Last evolution entry: ${lastEvoDate} — ${daysSinceEvo} days ago.`}
+
+After the review wraps, if the session surfaced a genuine phase shift or it's been a long time, mention in one sentence that it might be worth capturing as an evolution entry. Example: "This might be worth logging as a phase moment — want to do an evolution entry?" Don't produce the entry — just suggest it, once, naturally. Keep modes distinct.`
+    : '';
+
+  return [identity, context, stateDoc, goalsFull_, goalsSummary, patterns, chatInsights, peopleNotes, evolution, recentContext, incompleteCtx, reviewInstructions, goalsSummaryUpdate, peopleNotesUpdate, peopleUpdate, evolutionSuggestion]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+// ── Init review mode ──────────────────────────────────────────────────────────
+async function initReviewMode() {
+  if (S.reviewMode) return; // already in review mode
+  S.reviewMode = true;
+  document.getElementById('review-btn').classList.add('on');
+  document.getElementById('brief-btn').classList.remove('on');
+  S.brief = false;
+
+  setStat('thinking', 'loading review context…');
+  S.thinking = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('chat').innerHTML = '';
+  showDots();
+
+  const [goalsFull, reviewLog] = await Promise.all([
+    fetchGoalsFull(),
+    fetchReviewLog(),
+  ]);
+  S.reviewLog    = reviewLog;
+  S.existingReview = reviewLog;
+
+  const incomplete = hasIncompleteReview(reviewLog);
+  let incompleteBlock = null;
+  if (incomplete) {
+    const lastIdx = reviewLog.lastIndexOf('\n## ');
+    incompleteBlock = lastIdx === -1 ? reviewLog : reviewLog.slice(lastIdx + 1);
+  }
+
+  const sysPrompt = buildReviewPrompt(goalsFull, incompleteBlock);
+
+  try {
+    const openingContent = incomplete
+      ? `Continue the review. It is ${S.sessionDow}, ${S.sessionDate} in Manila.`
+      : `Start the review session. It is ${S.sessionDow}, ${S.sessionDate} in Manila.`;
+    const opening = [{ role: 'user', content: openingContent }];
+    const reply = await callClaude(opening, sysPrompt);
+    hideDots();
+
+    if (incomplete) {
+      addSys('incomplete review found — continuing');
+    } else {
+      addSys('review mode');
+    }
+
+    addMsg('assistant', reply);
+    S.messages = [
+      { role: 'user', content: openingContent },
+      { role: 'assistant', content: reply },
+    ];
+    saveDraft();
+    setStat('ready', `review — ${S.sessionDate}`);
+  } catch(err) {
+    hideDots();
+    addSys(`could not connect: ${friendlyError(err)}`);
+    setStat('error', 'connection failed');
+  } finally {
+    S.thinking = false;
+    document.getElementById('send-btn').disabled = false;
+  }
 }
 
 // ── Draft persistence ─────────────────────────────────────────────────────────
@@ -695,6 +976,27 @@ function extractChatInsights(txt) {
   return txt.slice(s + 25, e).trim();
 }
 
+function extractPeopleNotes(txt) {
+  const s = txt.indexOf('<<<PEOPLE_NOTES_START>>>');
+  const e = txt.indexOf('<<<PEOPLE_NOTES_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 24, e).trim();
+}
+
+function extractGoalsSummary(txt) {
+  const s = txt.indexOf('<<<GOALS_SUMMARY_START>>>');
+  const e = txt.indexOf('<<<GOALS_SUMMARY_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 25, e).trim();
+}
+
+function extractReview(txt) {
+  const s = txt.indexOf('<<<REVIEW_START>>>');
+  const e = txt.indexOf('<<<REVIEW_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 18, e).trim();
+}
+
 function detectType(reply) {
   // Check the entry content (not the reply preamble) to avoid misfiling
   const entry = extractEntry(reply) || reply;
@@ -874,10 +1176,14 @@ function dismissPatterns() {
   S.pendingPatterns = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
-  if (S._queuedInsights) {
+  if (S._queuedGoalsSummary) {
+    const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
+  } else if (S._queuedInsights) {
     const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
   } else if (S._queuedPeople) {
     const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+  } else if (S._queuedPeopleNotes) {
+    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
   }
@@ -921,16 +1227,102 @@ async function savePatterns() {
     setTimeout(() => {
       document.getElementById('pat-bar').classList.remove('show');
       document.getElementById('pat-st').className = '';
-      if (S._queuedInsights) {
+      if (S._queuedGoalsSummary) {
+        const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
+      } else if (S._queuedInsights) {
         const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
       } else if (S._queuedPeople) {
         const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+      } else if (S._queuedPeopleNotes) {
+        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
       }
     }, 2400);
   } catch(err) {
     setPatSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── Goals summary save ────────────────────────────────────────────────────────
+function setGoalsSummarySt(type, txt) {
+  const e = document.getElementById('goals-summary-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showGoalsSummaryBar(content) {
+  S.pendingGoalsSummary = content;
+  document.getElementById('goals-summary-go').disabled = false;
+  document.getElementById('goals-summary-st').className = '';
+  document.getElementById('goals-summary-bar').classList.add('show');
+}
+
+function dismissGoalsSummary() {
+  S.pendingGoalsSummary = null;
+  document.getElementById('goals-summary-bar').classList.remove('show');
+  document.getElementById('goals-summary-st').className = '';
+  if (S._queuedInsights) {
+    const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
+  } else if (S._queuedPeople) {
+    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+  } else if (S._queuedPeopleNotes) {
+    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+  } else if (S._queuedEvolution) {
+    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  }
+}
+
+async function saveGoalsSummary() {
+  if (!S.pendingGoalsSummary) return;
+  const btn = document.getElementById('goals-summary-go');
+  btn.disabled = true;
+  setGoalsSummarySt('info', 'writing…');
+  try {
+    const path = 'notes/goals-summary.md';
+    const { sha } = await getFileInfo(path);
+    const body = {
+      message: 'goals-summary: update notes/goals-summary.md',
+      content: b64Encode(S.pendingGoalsSummary),
+    };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${CREDS.githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.goals = S.pendingGoalsSummary;
+    setGoalsSummarySt('ok', 'saved');
+    addSys('goals summary updated → notes/goals-summary.md');
+    S.pendingGoalsSummary = null;
+    setTimeout(() => {
+      document.getElementById('goals-summary-bar').classList.remove('show');
+      document.getElementById('goals-summary-st').className = '';
+      if (S._queuedInsights) {
+        const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
+      } else if (S._queuedPeople) {
+        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+      } else if (S._queuedPeopleNotes) {
+        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+      } else if (S._queuedEvolution) {
+        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      }
+    }, 2400);
+  } catch(err) {
+    setGoalsSummarySt('err', friendlyError(err));
     btn.disabled = false;
   }
 }
@@ -954,6 +1346,8 @@ function dismissInsights() {
   document.getElementById('insights-st').className = '';
   if (S._queuedPeople) {
     const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+  } else if (S._queuedPeopleNotes) {
+    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
   }
@@ -999,6 +1393,8 @@ async function saveInsights() {
       document.getElementById('insights-st').className = '';
       if (S._queuedPeople) {
         const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+      } else if (S._queuedPeopleNotes) {
+        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
       }
@@ -1026,7 +1422,9 @@ function dismissPeople() {
   S.pendingPeople = null;
   document.getElementById('people-bar').classList.remove('show');
   document.getElementById('people-st').className = '';
-  if (S._queuedEvolution) {
+  if (S._queuedPeopleNotes) {
+    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+  } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
   }
 }
@@ -1058,12 +1456,152 @@ async function savePeople() {
     setTimeout(() => {
       document.getElementById('people-bar').classList.remove('show');
       document.getElementById('people-st').className = '';
-      if (S._queuedEvolution) {
+      if (S._queuedPeopleNotes) {
+        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+      } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
       }
     }, 2400);
   } catch(err) {
     setPeopleSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── People notes save ─────────────────────────────────────────────────────────
+function setPeopleNotesSt(type, txt) {
+  const e = document.getElementById('people-notes-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showPeopleNotesBar(content) {
+  S.pendingPeopleNotes = content;
+  document.getElementById('people-notes-go').disabled = false;
+  document.getElementById('people-notes-st').className = '';
+  document.getElementById('people-notes-bar').classList.add('show');
+}
+
+function dismissPeopleNotes() {
+  S.pendingPeopleNotes = null;
+  document.getElementById('people-notes-bar').classList.remove('show');
+  document.getElementById('people-notes-st').className = '';
+  if (S._queuedEvolution) {
+    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  }
+}
+
+async function savePeopleNotes() {
+  if (!S.pendingPeopleNotes) return;
+  const btn = document.getElementById('people-notes-go');
+  btn.disabled = true;
+  setPeopleNotesSt('info', 'writing…');
+  try {
+    const path = 'notes/people-notes.md';
+    const { sha } = await getFileInfo(path);
+    const body = { message: 'people-notes: update notes/people-notes.md', content: b64Encode(S.pendingPeopleNotes) };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.peopleNotes = S.pendingPeopleNotes;
+    setPeopleNotesSt('ok', 'saved');
+    addSys('people notes updated → notes/people-notes.md');
+    S.pendingPeopleNotes = null;
+    setTimeout(() => {
+      document.getElementById('people-notes-bar').classList.remove('show');
+      document.getElementById('people-notes-st').className = '';
+      if (S._queuedEvolution) {
+        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      }
+    }, 2400);
+  } catch(err) {
+    setPeopleNotesSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── Review save ───────────────────────────────────────────────────────────────
+function setReviewSt(type, txt) {
+  const e = document.getElementById('review-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showReviewBar(content) {
+  S.pendingReview = content;
+  document.getElementById('review-go').disabled = false;
+  document.getElementById('review-st').className = '';
+  document.getElementById('review-bar').classList.add('show');
+}
+
+function dismissReview() {
+  S.pendingReview = null;
+  document.getElementById('review-bar').classList.remove('show');
+  document.getElementById('review-st').className = '';
+  if (S._queuedGoalsSummary) {
+    const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
+  } else if (S._queuedPeople) {
+    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+  } else if (S._queuedPeopleNotes) {
+    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+  }
+}
+
+async function saveReview() {
+  if (!S.pendingReview) return;
+  const btn = document.getElementById('review-go');
+  btn.disabled = true;
+  setReviewSt('info', 'writing…');
+  try {
+    const path = 'goals/review-log.md';
+    const { sha } = await getFileInfo(path);
+    const merged = mergeReviewEntry(S.existingReview, S.pendingReview);
+    const body = {
+      message: 'review: update goals/review-log.md',
+      content: b64Encode(merged),
+    };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${CREDS.githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.reviewLog = merged;
+    setReviewSt('ok', 'saved');
+    addSys('review saved → goals/review-log.md');
+    S.pendingReview = null;
+    setTimeout(() => {
+      document.getElementById('review-bar').classList.remove('show');
+      document.getElementById('review-st').className = '';
+      if (S._queuedGoalsSummary) {
+        const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
+      } else if (S._queuedPeople) {
+        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+      } else if (S._queuedPeopleNotes) {
+        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+      }
+    }, 2400);
+  } catch(err) {
+    setReviewSt('err', friendlyError(err));
     btn.disabled = false;
   }
 }
@@ -1133,7 +1671,7 @@ function showSaveBar(entry, type) {
 }
 
 // ── Claude API (with one retry) ───────────────────────────────────────────────
-async function callClaude(messages, retrying = false) {
+async function callClaude(messages, sysOverride = null, retrying = false) {
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1146,7 +1684,7 @@ async function callClaude(messages, retrying = false) {
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: 2500,
-        system:     buildSysPrompt(),
+        system:     sysOverride || buildSysPrompt(),
         messages,
       }),
     });
@@ -1160,7 +1698,7 @@ async function callClaude(messages, retrying = false) {
   } catch(err) {
     if (!retrying && (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed'))) {
       await new Promise(r => setTimeout(r, 1200));
-      return callClaude(messages, true);
+      return callClaude(messages, sysOverride, true);
     }
     throw err;
   }
@@ -1191,45 +1729,63 @@ async function sendMsg() {
   try {
     const reply = await callClaude(S.messages);
     hideDots();
-    const entry     = extractEntry(reply);
-    const state     = extractState(reply);
-    const patterns  = extractPatterns(reply);
-    const insights  = extractChatInsights(reply);
-    const people    = extractPeople(reply);
-    const evolution = extractEvolution(reply);
+    const entry        = S.reviewMode ? null : extractEntry(reply);
+    const review       = S.reviewMode ? extractReview(reply) : null;
+    const state        = extractState(reply);
+    const patterns     = extractPatterns(reply);
+    const goalsSummary = extractGoalsSummary(reply);
+    const insights     = extractChatInsights(reply);
+    const people       = extractPeople(reply);
+    const peopleNotes  = extractPeopleNotes(reply);
+    const evolution    = extractEvolution(reply);
     const deepFetch = reply.includes('<<<FETCH_DEEP>>>');
     // Strip all markers from displayed text
     let disp = reply;
-    if (entry)    disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
-    if (state)    disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
-    if (patterns) disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
-    if (insights) disp = disp.replace(/<<<CHAT_INSIGHTS_START>>>[\s\S]*?<<<CHAT_INSIGHTS_END>>>/g, '').trim();
-    if (people)   disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
-    if (evolution) disp = disp.replace(/<<<EVOLUTION_START>>>[\s\S]*?<<<EVOLUTION_END>>>/g, '').trim();
+    if (review)       disp = disp.replace(/<<<REVIEW_START>>>[\s\S]*?<<<REVIEW_END>>>/g, '').trim() || 'Review ready.';
+    if (entry)        disp = disp.slice(0, disp.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry ready.';
+    if (state)        disp = disp.replace(/<<<STATE_START>>>[\s\S]*?<<<STATE_END>>>/g, '').trim();
+    if (patterns)     disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
+    if (goalsSummary) disp = disp.replace(/<<<GOALS_SUMMARY_START>>>[\s\S]*?<<<GOALS_SUMMARY_END>>>/g, '').trim();
+    if (insights)     disp = disp.replace(/<<<CHAT_INSIGHTS_START>>>[\s\S]*?<<<CHAT_INSIGHTS_END>>>/g, '').trim();
+    if (people)       disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
+    if (peopleNotes)  disp = disp.replace(/<<<PEOPLE_NOTES_START>>>[\s\S]*?<<<PEOPLE_NOTES_END>>>/g, '').trim();
+    if (evolution)    disp = disp.replace(/<<<EVOLUTION_START>>>[\s\S]*?<<<EVOLUTION_END>>>/g, '').trim();
     disp = disp.replace(/<<<FETCH_DEEP>>>/g, '').trim();
     addMsg('assistant', disp || 'Done.');
     S.messages.push({ role: 'assistant', content: reply });
     saveDraft();
     if (state) showStateBar(state);
-    // Queue order: entry → patterns → insights → people → evolution
+    // First bar in cascade: review bar (review mode) or entry bar (daily mode)
+    const firstBar = S.reviewMode ? review : entry;
+    // Queue order (daily):  entry → patterns → goals-summary → insights → people → people-notes → evolution
+    // Queue order (review): review → goals-summary → people-notes → people-profile
     if (patterns) {
-      if (entry) S._queuedPatterns = patterns;
+      if (firstBar) S._queuedPatterns = patterns;
       else showPatBar(patterns);
     }
+    if (goalsSummary) {
+      if (firstBar || patterns) S._queuedGoalsSummary = goalsSummary;
+      else showGoalsSummaryBar(goalsSummary);
+    }
     if (insights) {
-      if (entry || patterns) S._queuedInsights = insights;
+      if (firstBar || patterns || goalsSummary) S._queuedInsights = insights;
       else showInsightsBar(insights);
     }
     if (people) {
-      if (entry || patterns || insights) S._queuedPeople = people;
+      if (firstBar || patterns || goalsSummary || insights) S._queuedPeople = people;
       else showPeopleBar(people);
     }
+    if (peopleNotes) {
+      if (firstBar || patterns || goalsSummary || insights || people) S._queuedPeopleNotes = peopleNotes;
+      else showPeopleNotesBar(peopleNotes);
+    }
     if (evolution) {
-      if (entry || patterns || insights || people) S._queuedEvolution = evolution;
+      if (firstBar || patterns || goalsSummary || insights || people || peopleNotes) S._queuedEvolution = evolution;
       else showEvoBar(evolution);
     }
-    if (entry) showSaveBar(entry, detectType(reply));
-    setStat('ready', `ready — ${S.sessionDate}`);
+    if (review) showReviewBar(review);
+    else if (entry) showSaveBar(entry, detectType(reply));
+    setStat('ready', S.reviewMode ? `review — ${S.sessionDate}` : `ready — ${S.sessionDate}`);
     // Trigger deep context fetch in background if signaled
     if (deepFetch && !S.deepFetched) {
       S.deepFetched = true;
@@ -1269,20 +1825,30 @@ function _clearAndStart() {
   S.brief = false; S.existingEntry = null; S.recentEntries = []; S.stateOfMiles = null;
   S.goals = null; S.patterns = null; S.pendingPatterns = null;
   S.chatInsights = null; S.pendingInsights = null; S._queuedInsights = null;
+  S.pendingGoalsSummary = null; S._queuedGoalsSummary = null;
   S.deepFetched = false; S._queuedPatterns = null;
   S.peopleProfile = null; S.pendingPeople = null; S._queuedPeople = null;
+  S.peopleNotes = null; S.pendingPeopleNotes = null; S._queuedPeopleNotes = null;
   S.evolution = null; S.pendingEvolution = null; S.evoTrigger = false; S._queuedEvolution = null;
+  S.reviewMode = false; S.pendingReview = null; S.existingReview = null; S.reviewLog = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
+  document.getElementById('goals-summary-bar').classList.remove('show');
+  document.getElementById('goals-summary-st').className = '';
   document.getElementById('insights-bar').classList.remove('show');
   document.getElementById('insights-st').className = '';
   document.getElementById('state-bar').classList.remove('show');
   document.getElementById('state-st').className = '';
   document.getElementById('people-bar').classList.remove('show');
   document.getElementById('people-st').className = '';
+  document.getElementById('people-notes-bar').classList.remove('show');
+  document.getElementById('people-notes-st').className = '';
   document.getElementById('evo-bar').classList.remove('show');
   document.getElementById('evo-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
+  document.getElementById('review-btn').classList.remove('on');
+  document.getElementById('review-bar').classList.remove('show');
+  document.getElementById('review-st').className = '';
   document.getElementById('chat').innerHTML = '';
   document.getElementById('save-bar').classList.remove('show');
   document.getElementById('save-st').className = '';
@@ -1292,9 +1858,19 @@ function _clearAndStart() {
 }
 
 function _initSessionMeta() {
-  S.sessionDate = todayManila();
-  S.sessionDow  = dowManila();
-  S.sessionDay  = dayIndexManila();
+  const today = todayManila();
+  if (hourManila() < 3) {
+    const [y, m, d] = today.split('-').map(Number);
+    S.sessionDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date(Date.UTC(y, m - 1, d - 1)));
+  } else {
+    S.sessionDate = today;
+  }
+  const [y, m, d] = S.sessionDate.split('-').map(Number);
+  const sessionDt = new Date(Date.UTC(y, m - 1, d));
+  S.sessionDow = dowManila(sessionDt);
+  S.sessionDay = dayIndexManila(sessionDt);
   document.getElementById('wm-date').textContent = S.sessionDate;
 }
 
@@ -1336,15 +1912,43 @@ function compressEntry(content) {
 }
 
 function fetchGoals()         { return fetchEntry('notes/goals-summary.md'); }
+function fetchGoalsFull()     { return fetchEntry('goals/current.md'); }
 function fetchPatterns()      { return fetchEntry('notes/patterns.md'); }
 function fetchChatInsights()  { return fetchEntry('notes/chat-insights.md'); }
 function fetchPeopleProfile() { return fetchEntry('notes/people-profile.md'); }
+function fetchPeopleNotes()   { return fetchEntry('notes/people-notes.md'); }
 function fetchEvolution()     { return fetchEntry('notes/evolution.md'); }
+function fetchReviewLog()     { return fetchEntry('goals/review-log.md'); }
 
 function parseEvolutionDate(content) {
   if (!content) return null;
   const m = content.match(/last_updated:\s*(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : null;
+}
+
+function parseLastReviewDate(content) {
+  if (!content) return null;
+  const matches = [...content.matchAll(/^## (\d{4}-\d{2}-\d{2})/gm)];
+  return matches.length ? matches[matches.length - 1][1] : null;
+}
+
+function hasIncompleteReview(content) {
+  if (!content) return false;
+  const lastBlock = content.lastIndexOf('\n## ');
+  if (lastBlock === -1 && !content.startsWith('## ')) return false;
+  const blockStart = lastBlock === -1 ? 0 : lastBlock + 1;
+  const block = content.slice(blockStart);
+  return /\*\*Status: incomplete\*\*/i.test(block);
+}
+
+function mergeReviewEntry(existingContent, newBlock) {
+  if (!existingContent || !hasIncompleteReview(existingContent)) {
+    return existingContent ? existingContent + '\n\n---\n\n' + newBlock : newBlock;
+  }
+  // Find the last ## YYYY-MM-DD block and replace it
+  const lastIdx = existingContent.lastIndexOf('\n## ');
+  const blockStart = lastIdx === -1 ? 0 : lastIdx + 1;
+  return existingContent.slice(0, blockStart).trimEnd() + (blockStart > 0 ? '\n\n---\n\n' : '') + newBlock;
 }
 
 function _computeEvoTrigger(evolutionContent) {
@@ -1447,14 +2051,16 @@ function buildGraymatterTrend(entries) {
 
 // ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
-  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, evolution] = await Promise.all([
+  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchRecentEntries(),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
     fetchChatInsights(),
     fetchPeopleProfile(),
+    fetchPeopleNotes(),
     fetchEvolution(),
+    fetchReviewLog(),
   ]);
   S.recentEntries = recentEntries;
   S.stateOfMiles  = stateOfMiles;
@@ -1462,7 +2068,9 @@ async function loadSessionContext() {
   S.patterns      = patterns;
   S.chatInsights  = chatInsights;
   S.peopleProfile = peopleProfile;
+  S.peopleNotes   = peopleNotes;
   S.evolution     = evolution;
+  S.reviewLog     = reviewLog;
   S.evoTrigger    = _computeEvoTrigger(evolution);
   if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }
 }
@@ -1477,8 +2085,8 @@ async function startSess() {
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
-  // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution in parallel
-  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, evolution] = await Promise.all([
+  // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + review log in parallel
+  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(),
     fetchStateOfMiles(),
@@ -1486,7 +2094,9 @@ async function startSess() {
     fetchPatterns(),
     fetchChatInsights(),
     fetchPeopleProfile(),
+    fetchPeopleNotes(),
     fetchEvolution(),
+    fetchReviewLog(),
   ]);
   S.existingEntry  = existing;
   S.recentEntries  = recentEntries;
@@ -1495,7 +2105,9 @@ async function startSess() {
   S.patterns       = patterns;
   S.chatInsights   = chatInsights;
   S.peopleProfile  = peopleProfile;
+  S.peopleNotes    = peopleNotes;
   S.evolution      = evolution;
+  S.reviewLog      = reviewLog;
   S.evoTrigger     = _computeEvoTrigger(evolution);
   if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }
 
@@ -1961,32 +2573,48 @@ async function generateDashInsights(avgs, correlations, patternsContent, people,
   const patternsExcerpt = patternsContent ? patternsContent.slice(0, 500) : 'No patterns doc yet.';
   const peopleNames = people.filter(p => p.sessions_mentioned >= 3).map(p => `${p.name} (${p.relationship})`).join(', ') || 'None yet.';
 
-  const systemPrompt = `You are Miles's personal intelligence system. Miles (she/her) lives in Manila with rheumatoid arthritis and POTS.
+  const systemPrompt = `You are Miles's personal intelligence system. Miles (she/her) lives in Manila with rheumatoid arthritis and POTS. You are looking at her last 14 days of health data.
 
-Voice: Co-Star. Calm, dry, precise. Unsettling because it is accurate, not because it is alarming. You name what the data reveals about behavior and pattern. No therapy-speak. No em-dashes. No markdown. No dramatizing.
+Voice: Co-Star. Direct, second-person, slightly oracular. You talk to Miles, not about her.
 
 Rules:
-- Never mention scores, numbers, entry counts, or record-highs/lows.
+- Second-person throughout. "You've been…", "Your energy…", "You are…" — never "Miles has" or "the data shows"
+- No hedging. No "it appears", "it may be", "it seems", "suggests"
+- No academic framing. No "analysis indicates", "data suggests", "correlates with"
+- No numbers, scores, entry counts, or record references
+- Short, declarative sentences. Observe — don't explain.
 - Never describe what happened. Name what it means.
-- Do not dramatize. Observe coolly.
 
-CORRECT: "Rest is not translating to recovery. Something is draining what sleep restores."
-CORRECT: "Social connection is being treated as optional. It isn't."
-CORRECT: "The body is being managed. The conditions driving it are not."
-WRONG: "1 out of 5 is an alarm state." — mentions a number, dramatizes
-WRONG: "Single data point shows severe mood collapse." — describes events, mentions entry count
+CORRECT: "Rest isn't translating to recovery. Something is draining what sleep restores."
+CORRECT: "You're treating social connection as optional. It isn't."
+CORRECT: "You're managing the body. You're not addressing what's driving it."
+WRONG: "Your energy score of 2 is critically low." — number, academic framing
+WRONG: "Data suggests sleep quality is declining." — academic, third-person
 WRONG: "This is not a bad day. This is a shutdown day." — dramatic, not observational
+
+Avoid:
+- Overworked adverbs: "quietly", "deeply", "fundamentally", "remarkably"
+- AI vocabulary: "delve", "certainly", "leverage", "robust", "streamline", "harness", "tapestry", "landscape", "paradigm"
+- Copula dodges: "serves as", "stands as", "marks", "represents" — just say "is"
+- Negative parallelism: "It's not X. It's Y." — once max, never as a reflex
+- Fake suspense: "Here's the thing", "Here's the kicker"
+- Rhetorical questions you immediately answer: "The result? Devastating."
+- Patronizing analogies: "Think of it as...", "It's like a..."
+- Bullet-point logic dressed as sentences: "The first... The second... The third..."
+- Signposted conclusions: "In conclusion", "To sum up"
+- Tricolon pileups — one rule of three is fine, three in a row is a tell
+- Em-dash overuse — use sparingly or not at all
 
 Output exactly 8 lines. Each line starts with a label. No blank lines.
 
-OVERVIEW: [One sentence. The underlying dynamic or pattern — not events, not data. What is structurally true about this period.]
-OBS1: [Metric name]: [What this metric reveals about behavior or trajectory. No numbers.]
-OBS2: [Metric name]: [The gap or contradiction this metric points to. No numbers.]
-OBS3: [Metric name]: [Same — meaning, not measurement. No numbers.]
-MISSION1: [Verb phrase only. Specific, no explanation. E.g.: "Log sleep within 30 minutes of waking."]
-MISSION2: [Verb phrase only. Specific, no explanation.]
-MISSION3: [Verb phrase only. Specific, no explanation.]
-BLIND_SPOT: [One sentence. What is consistently absent, avoided, or unnamed.]`;
+OVERVIEW: [One sentence. The structural dynamic of this period — not events or data. Speak directly to Miles.]
+OBS1: [Metric name]: [What this reveals about your behavior or trajectory. Direct, second-person. No numbers.]
+OBS2: [Metric name]: [The gap or contradiction this points to. What you're doing or not doing.]
+OBS3: [Metric name]: [Same — meaning, not measurement. What it says about you right now.]
+MISSION1: [Verb phrase. Specific, direct address. E.g.: "Track sleep within 30 minutes of waking."]
+MISSION2: [Verb phrase. Specific.]
+MISSION3: [Verb phrase. Specific.]
+BLIND_SPOT: [One sentence. What you're consistently avoiding, not naming, or treating as fixed.]`;
 
   const userMessage = `${entryCount} entries logged in this period.
 
@@ -2152,6 +2780,7 @@ function renderDash(entries, people, patternsContent, evoEntries, insights) {
     : `<div class="dash-empty">People appear here after 3+ sessions.</div>`;
 
   // Evolution
+  const lastEvoDate = evoEntries.length ? evoEntries[0].date : null;
   const evoHTML = evoEntries.length
     ? evoEntries.slice(0, 3).map(e => `<div class="evo-entry">
         <div class="evo-date">${e.date}</div>
@@ -2229,7 +2858,7 @@ function renderDash(entries, people, patternsContent, evoEntries, insights) {
     </div>
 
     <div class="dash-section">
-      <div class="dash-section-label">Evolution</div>
+      <div class="dash-section-label">Evolution${lastEvoDate ? `<span class="dash-section-meta">last entry ${lastEvoDate}</span>` : ''}</div>
       ${evoHTML}
     </div>
   `;
