@@ -25,8 +25,6 @@ This file tracks feature status and planned work. Update it when features ship, 
 
 ## Backlog
 
-- [ ] **Weekly review workflow** — paths exist (`journal/weekly/YYYY-WNN.md`) and `detectType()` handles it, but no active prompt or trigger. Needs a session mode or explicit Claude instructions.
-- [ ] **Monthly summary** — same as weekly: path in `pathFor()`, detection in `detectType()`, but no active workflow.
 - [ ] **Clinical summaries** — paths for `summaries/psychiatrist/` and `summaries/rheumatologist/` exist but unused. Could be activated with a dedicated session type or explicit trigger phrase.
 - [ ] **Dashboard: people-notes integration** — once people-notes ships, surface relationship narratives in the Inner Circle section alongside velocity data.
 - [ ] **Dashboard: review-log integration** — show last review date and key next steps on dashboard.
@@ -57,10 +55,25 @@ This file tracks feature status and planned work. Update it when features ship, 
 - [x] **Goals summary maintenance** — `notes/goals-summary.md` write path via `<<<GOALS_SUMMARY_START>>>` markers; save bar (teal); conservative daily trigger; `GOALS_SUMMARY_UPDATES` block in system prompt *(Apr 5, 2026)*
 - [x] **Review Mode** — `initReviewMode()` fetches all review context; `buildReviewPrompt()` separate system prompt; `<<<REVIEW_START>>>` / `<<<REVIEW_END>>>` markers; `saveReview()` merges incomplete entries; cascade `review → goals-summary → people → people-notes`; amber save bar; review nav button; overdue prompt in daily sessions *(Apr 5, 2026)*
 - [x] **Evolution optimization** — entry quality prompt draws from patterns + people-notes + state-of-miles; post-review evolution suggestion when 90+ days since last entry; dashboard shows last evolution date in section header *(Apr 5, 2026)*
+- [x] **Auto-update patterns.md** — `triggerPostEntryReview()` fires after every entry save (and review save). Separate focused API call (Sonnet, 3500 tokens) with merge-mode output: only changed sections output, `mergePatternsUpdate()` splices them into existing doc. Silent fail; user confirms before save. ~$0.019/session. *(Apr 5, 2026)*
 
 ---
 
 ## Feature Specs
+
+### Auto-Update Patterns.md
+
+**Problem:** Patterns doc only updated when Claude spontaneously outputs markers in the main session reply — inconsistent due to token budget pressure and conservative update thresholds.
+
+**Fix:** `triggerPostEntryReview()` fires after `saveEntry()` and `saveReview()` succeed. Separate `callClaude()` call with `buildPatternsReviewPrompt()` and `maxTokens: 3500`.
+
+**Merge mode:** Claude outputs only changed `## Section` blocks tagged with `MERGE_MODE: true`. `mergePatternsUpdate()` splices them into the existing doc. Unchanged sections preserved verbatim. Typical output: 300–600 tokens.
+
+**Guards:** `_reviewFired` / `_reviewRunning` prevent double-fires. Session date check discards results if new session started before call returns. Silently discards if main session already queued patterns.
+
+**Scope:** Patterns only. Chat-insights stays explicit-trigger (Miles signals in-session).
+
+---
 
 ### Review Mode
 

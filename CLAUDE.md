@@ -89,7 +89,7 @@ Config access: ⚙ button top-right. Anthropic auto-revokes keys found in chat o
 'anthropic-dangerous-direct-browser-access': 'true',  // missing = CORS fail
 ```
 
-**Max tokens:** `2500` minimum. Full entries run 600–900 tokens output.
+**Max tokens:** `2500` default in `callClaude()` (optional 4th param `maxTokens`). Post-entry review uses `3500`. Full entries run 600–900 tokens output.
 
 **Timezone:** All date logic uses `Asia/Manila` via `Intl.DateTimeFormat`. Never use `Date()` offsets.
 
@@ -136,6 +136,8 @@ const S = {
   evoTrigger:       false, // whether evolution entry should be prompted this session
   _queuedPeople:    null,  // people update queued after patterns bar clears
   _queuedEvolution: null,  // evolution update queued after people bar clears
+  _reviewFired:     false, // prevents duplicate post-save review calls per session
+  _reviewRunning:   false, // true while background patterns review call is in flight
 };
 ```
 
@@ -153,7 +155,7 @@ identity → context → stateDoc → goalsContext → patternsContext → chatI
 
 `goalsContext` is fetched from `notes/goals-summary.md` — 3–5 line active goals summary. Not the full goals doc. Update when priorities shift. Claude references this during conversation to surface goal connections and flag stagnation. Suppressed on hard days / health flares.
 
-`patternsContext` is fetched from `notes/patterns.md` — Claude's accumulated observations across sessions. Injected as context; Claude uses it without referencing it directly. Updated by Claude via `<<<PATTERNS_START>>>` / `<<<PATTERNS_END>>>` markers at session end. Miles confirms before saving.
+`patternsContext` is fetched from `notes/patterns.md` — Claude's accumulated observations across sessions. Injected as context; Claude uses it without referencing it directly. Updated two ways: (1) Claude may output markers in the main session reply; (2) `triggerPostEntryReview()` fires a background call after every entry or review save using `buildPatternsReviewPrompt()` with merge-mode output (only changed sections). Miles confirms before saving either way.
 
 `chatInsightsContext` is fetched from `notes/chat-insights.md` — named observations, open threads, and reflective insights captured across sessions. Claude updates it via `<<<CHAT_INSIGHTS_START>>>` / `<<<CHAT_INSIGHTS_END>>>` markers when a named experience surfaces, a realization is articulated, or Miles signals something is worth keeping. Claude infers intent — no special syntax required. Queued to save after patterns bar in the cascade.
 
@@ -225,6 +227,8 @@ When Review Mode ships, `review` will slot in ahead of `people` in the cascade.
 - Evolution bar: queued via `S._queuedEvolution` — always last
 
 If only one type is present (e.g. people with no entry), it shows immediately.
+
+After entry or review saves, `triggerPostEntryReview()` fires in the background (~5–8s). If it produces a patterns update not already in the queue, pat-bar appears after the existing cascade completes.
 
 ---
 

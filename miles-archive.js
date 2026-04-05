@@ -43,6 +43,8 @@ const S = {
   pendingReview:      null,  // review content pending save
   existingReview:     null,  // current review-log.md content (for incomplete merge)
   reviewLog:          null,  // fetched review-log.md (for overdue check)
+  _reviewFired:       false, // prevents duplicate post-save review calls per session
+  _reviewRunning:     false, // true while background patterns review call is in flight
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -572,6 +574,128 @@ NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactl
     .join('\n\n');
 }
 
+// ── Post-entry patterns review prompt ────────────────────────────────────────
+function buildPatternsReviewPrompt() {
+  const date = S.sessionDate;
+
+  const patternsDoc = S.patterns
+    ? `CURRENT PATTERNS DOC:\n${S.patterns}`
+    : `CURRENT PATTERNS DOC: none — if the session contains relevant observations, output a fresh doc.`;
+
+  return `You are a post-session analyst. Your only job is to evaluate whether notes/patterns.md needs updating based on the session that just completed. You do not converse.
+
+TODAY: ${date} (Manila, GMT+8).
+
+${patternsDoc}
+
+OUTPUT FORMAT — merge mode only. Output only the sections that have new data from today's session:
+
+<<<PATTERNS_START>>>
+MERGE_MODE: true
+Last updated: ${date}
+
+## [Section Name]
+[full updated section content]
+
+## [Another Section Name if needed]
+[full updated section content]
+<<<PATTERNS_END>>>
+
+If nothing warrants updating, output exactly: NO_UPDATE
+
+WHAT TO OUTPUT (changed sections only):
+- ## Open Threads — if any thread was opened, closed/resolved, or updated today
+- ## Wins & Milestones — if a win occurred today
+- ## Goal Alignment — if a goal moved, stalled, or new evidence emerged
+- ## Health Correlations, ## Behavioral Patterns, or ## Emotional Patterns subsection — only if today adds a new data point (new confirmed instance, new bullet, updated Last: date)
+
+WHAT NEVER TO OUTPUT:
+- Sections where today contributed no new data — leave them untouched
+- ## Declined unless a new decline occurred
+- Existing bullet wording — append new bullets, never rephrase existing ones
+- First: dates — immutable once set
+
+CLEANUP (apply conservatively):
+- Resolve an Open Thread only if it was explicitly resolved today
+- Flag a health/behavioral entry as stale only if its Last: date is visibly 8+ weeks before ${date} and no new data came in today
+
+CORE RULE: Do not output sections you have no new data for. Output only changed sections. Reproduce the full content of each section you do output — do not abbreviate or summarize.
+
+UPDATE THRESHOLD: When in doubt, update. Output a section if today adds any signal — a new data point, a win, a thread opened or closed, a goal that moved or stalled. DO NOT update only if today had no behavioral, emotional, or health content whatsoever.
+
+Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
+}
+
+// ── Merge patterns sections into existing doc ─────────────────────────────────
+function mergePatternsUpdate(currentDoc, updateDoc) {
+  if (!updateDoc.startsWith('MERGE_MODE: true')) {
+    return updateDoc; // full rewrite — use as-is
+  }
+
+  // Update the Last updated line
+  const dateMatch = updateDoc.match(/^Last updated: (\d{4}-\d{2}-\d{2})/m);
+  let result = dateMatch
+    ? currentDoc.replace(/\*Last updated:.*?\*/m, `*Last updated: ${dateMatch[1]}*`)
+    : currentDoc;
+
+  // Extract each ## Section block from the update and splice into current doc
+  const sectionRe = /^(## .+)$([\s\S]*?)(?=^## |\s*$)/gm;
+  let match;
+  while ((match = sectionRe.exec(updateDoc)) !== null) {
+    const header = match[1].trim();
+    const newContent = match[0].trimEnd();
+    const secRe = new RegExp(`(^${escRe(header)}$[\\s\\S]*?)(?=^## |\\s*$)`, 'm');
+    if (secRe.test(result)) {
+      result = result.replace(secRe, newContent + '\n\n');
+    } else {
+      // New section — insert before ## Declined
+      result = result.replace(/^## Declined/m, `${newContent}\n\n---\n\n## Declined`);
+    }
+  }
+  return result;
+}
+
+function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+// ── Post-entry background patterns review ─────────────────────────────────────
+async function triggerPostEntryReview() {
+  if (S._reviewFired || S._reviewRunning) return;
+  if (S.messages.length < 4) return;
+
+  const sessionDate = S.sessionDate;
+  S._reviewRunning = true;
+
+  const sessionSummary = S.messages.slice(-12)
+    .map(m => `[${m.role.toUpperCase()}]: ${m.content.slice(0, 500)}`)
+    .join('\n\n');
+
+  const reviewMessages = [{
+    role: 'user',
+    content: `Review this session and update patterns.md if warranted.\n\nSESSION:\n\n${sessionSummary}`,
+  }];
+
+  try {
+    const reply = await callClaude(reviewMessages, buildPatternsReviewPrompt(), false, 3500);
+
+    if (S.sessionDate !== sessionDate) return; // new session started while call was in flight
+
+    if (!reply.includes('<<<PATTERNS_START>>>')) return;
+
+    const rawPatterns = extractPatterns(reply);
+    if (rawPatterns && !S.pendingPatterns && !S._queuedPatterns) {
+      const merged = mergePatternsUpdate(S.patterns || '', rawPatterns);
+      if (!document.getElementById('pat-bar').classList.contains('show')) {
+        showPatBar(merged);
+      }
+    }
+  } catch(err) {
+    // silent fail — post-review is best-effort
+  } finally {
+    S._reviewFired = true;
+    S._reviewRunning = false;
+  }
+}
+
 // ── Review mode system prompt ─────────────────────────────────────────────────
 function buildReviewPrompt(incompleteBlock) {
   const { sessionDate: date, sessionDow: dow } = S;
@@ -1064,6 +1188,7 @@ async function saveEntry() {
     }
     setSaveSt('ok', 'saved');
     addSys(`saved → ${S.pendingPath}`);
+    triggerPostEntryReview();
     S.pendingEntry = null; S.pendingPath = null;
     try { localStorage.removeItem('ar_drafts'); } catch(e) {}
     setTimeout(() => {
@@ -1585,6 +1710,7 @@ async function saveReview() {
     S.reviewLog = merged;
     setReviewSt('ok', 'saved');
     addSys('review saved → goals/review-log.md');
+    triggerPostEntryReview();
     S.pendingReview = null;
     setTimeout(() => {
       document.getElementById('review-bar').classList.remove('show');
@@ -1668,7 +1794,7 @@ function showSaveBar(entry, type) {
 }
 
 // ── Claude API (with one retry) ───────────────────────────────────────────────
-async function callClaude(messages, sysOverride = null, retrying = false) {
+async function callClaude(messages, sysOverride = null, retrying = false, maxTokens = 2500) {
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -1680,7 +1806,7 @@ async function callClaude(messages, sysOverride = null, retrying = false) {
       },
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
-        max_tokens: 2500,
+        max_tokens: maxTokens,
         system:     sysOverride || buildSysPrompt(),
         messages,
       }),
@@ -1695,7 +1821,7 @@ async function callClaude(messages, sysOverride = null, retrying = false) {
   } catch(err) {
     if (!retrying && (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed'))) {
       await new Promise(r => setTimeout(r, 1200));
-      return callClaude(messages, sysOverride, true);
+      return callClaude(messages, sysOverride, true, maxTokens);
     }
     throw err;
   }
@@ -1828,6 +1954,7 @@ function _clearAndStart() {
   S.peopleNotes = null; S.pendingPeopleNotes = null; S._queuedPeopleNotes = null;
   S.evolution = null; S.pendingEvolution = null; S.evoTrigger = false; S._queuedEvolution = null;
   S.reviewMode = false; S.pendingReview = null; S.existingReview = null; S.reviewLog = null;
+  S._reviewFired = false; S._reviewRunning = false;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
   document.getElementById('goals-summary-bar').classList.remove('show');
