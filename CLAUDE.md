@@ -1,6 +1,6 @@
 # miles-archive — Project Reference
 
-*Last updated: March 26, 2026. Dashboard + people profile + evolution tracking live. Chat insights save target added.*
+*Last updated: April 5, 2026. Dashboard tone prompt rewritten. Planned files (people-notes, review-log) added to repo structure.*
 
 ---
 
@@ -216,6 +216,8 @@ Save bars queue in order. Each bar shows only after the previous is saved or dis
 entry → patterns → insights → people → evolution
 ```
 
+When Review Mode ships, `review` will slot in ahead of `people` in the cascade.
+
 - Entry bar: always first. `showSaveBar()` → `saveEntry()` / `dismissSave()`
 - Patterns bar: queued via `S._queuedPatterns` if entry is also present
 - Insights bar: queued via `S._queuedInsights` if entry or patterns is present; lavender (`#a78bfa`) accent
@@ -239,10 +241,6 @@ If only one type is present (e.g. people with no entry), it shows immediately.
 **Path mapping:**
 ```
 daily          → journal/daily/YYYY/YYYY-MM-DD.md
-weekly         → journal/weekly/YYYY-WNN.md
-monthly        → journal/monthly/YYYY-MM.md
-psychiatrist   → summaries/psychiatrist/YYYY-MM-DD.md
-rheumatologist → summaries/rheumatologist/YYYY-MM-DD.md
 goals          → goals/current.md
 ```
 
@@ -351,6 +349,7 @@ miles-data/
 │       └── 2026/YYYY-MM-DD.md
 ├── goals/
 │   ├── current.md
+│   ├── review-log.md                ← review session log (planned, created on first write)
 │   └── archive/
 │       ├── 2023.md
 │       ├── 2024.md
@@ -361,10 +360,9 @@ miles-data/
     ├── patterns.md                  ← accumulated patterns (Claude maintains)
     ├── chat-insights.md             ← named observations + open threads (Claude maintains)
     ├── people-profile.md            ← people YAML ledger (Claude maintains, created on first write)
+    ├── people-notes.md              ← richer per-person narratives (planned, created on first write)
     └── evolution.md                 ← quarterly life phase entries (Claude maintains, created on first write)
 ```
-
-Path mappings for `weekly/`, `monthly/`, and `summaries/` are in the code but those folders haven't been populated yet.
 
 ---
 
