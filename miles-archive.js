@@ -573,19 +573,17 @@ NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactl
 }
 
 // ── Review mode system prompt ─────────────────────────────────────────────────
-function buildReviewPrompt(goalsFull, incompleteBlock) {
+function buildReviewPrompt(incompleteBlock) {
   const { sessionDate: date, sessionDow: dow } = S;
 
-  const identity = `You are Miles's life coach — running a structured life review, not a daily journal session. Your job: evaluate where she is against her goals, surface what's working and what isn't, name gaps and wins clearly, and suggest next steps. Evaluative and coaching-forward. Not therapeutic, not journalistic.`;
+  const identity = `You are Miles's life coach running a quarterly review. You've read her journal, patterns, and goals. You have a formed point of view. Lead with what you see — push on what's stalled, celebrate what moved, challenge goals that need reconsideration. Coaching-forward. Not therapeutic, not an intake interview.`;
 
   const context = `TODAY: ${dow}, ${date} (GMT+8, Manila).`;
 
+  const sessionType = `SESSION TYPE: Review — not a daily session. Do not ask for bevel.ai health data. Health context is in State of Miles and recent entries. Never prompt Miles for health input.`;
+
   const stateDoc = S.stateOfMiles
     ? `STATE OF MILES\n${S.stateOfMiles}`
-    : '';
-
-  const goalsFull_ = goalsFull
-    ? `GOALS (FULL)\n${goalsFull}`
     : '';
 
   const goalsSummary = S.goals
@@ -616,40 +614,42 @@ function buildReviewPrompt(goalsFull, incompleteBlock) {
     ? `INCOMPLETE REVIEW (continue from here)\nA previous review was started but not finished. Continue it — pick up where it left off, complete the remaining sections, and output the full merged version in the markers. It will overwrite the incomplete entry.\n\nPrevious content:\n${incompleteBlock}`
     : '';
 
-  const reviewInstructions = `REVIEW INSTRUCTIONS
-Adapt to Miles's signal at the start of the session:
-- "Quick check" / "just a brief look" → check-in format (shorter, less structured)
-- Full intent or no signal → full structured pass
+  const reviewInstructions = `REVIEW SESSION FLOW
 
-Depth: read the conversation, ask clarifying questions if needed, but move toward the output — this is a coaching session, not an interview.
+Phase 1 — Opening (first reply only):
+Lead with 2–3 specific observations from the data — what moved, what stalled, what pattern keeps showing up. Don't ask for more data, don't recap. Ask ONE targeted question based on what you observed. Close with: "Say 'write it up' when you're ready for the written review."
 
-When ready, output the review wrapped in markers:
+Phase 2 — Coaching:
+Push back on stalled goals. Celebrate wins by name. Challenge goals that no longer fit. Surface new possibilities if patterns suggest them. After 2–3 turns, if you have enough: "I have what I need — want me to write this up?"
 
+Phase 3 — Output trigger:
+When Miles signals readiness ("go ahead", "write it up", "yes", "do it", "let's wrap") — output the full structured review in markers immediately, no preamble. If cut short, use Status: incomplete.
+
+VOICE: Direct, second-person, declarative. You've read her data — sound like it.
+
+OUTPUT FORMAT (wrap in markers when triggered):
 <<<REVIEW_START>>>
 ## ${date}
 **Status: complete**
 **Type: full**
 
 ### Alignment
-[How well is Miles tracking against her stated goals? Be specific — name goals that are moving and ones that aren't.]
+[Goal tracking: what's moving, what's stalled. Name specific goals.]
 
 ### Gaps & Challenges
-[What isn't working? What keeps coming up? Be direct.]
+[What isn't working. What keeps coming up. Be direct.]
 
 ### Wins
-[What has actually moved? Name specifics from patterns and recent entries.]
+[Specific wins from patterns and entries. Name them.]
 
 ### Opportunities & Next Steps
-[Concrete actions, not platitudes. What's the next right move?]
+[Concrete next moves, not platitudes.]
 
 ### New Goals / Habits to Consider
-[If patterns or conversation surfaced something worth adding, name it. Otherwise omit this section.]
+[Only if surfaced in coaching. Otherwise omit.]
 <<<REVIEW_END>>>
 
-For check-in format, use Type: check-in and keep sections brief.
-If session is cut short, use Status: incomplete — the save bar will still appear.
-
-VOICE: Same directness as daily sessions. Second-person, declarative, no hedging. Sound like someone who actually knows her.`;
+For check-in: use Type: check-in, keep sections brief.`;
 
   const goalsSummaryUpdate = `GOALS SUMMARY UPDATES
 At the end of every review session, output an updated goals summary — this is the natural capstone of a review. Always fire this.
@@ -712,7 +712,7 @@ ${daysSinceEvo === null ? 'No evolution entries exist yet.' : `Last evolution en
 After the review wraps, if the session surfaced a genuine phase shift or it's been a long time, mention in one sentence that it might be worth capturing as an evolution entry. Example: "This might be worth logging as a phase moment — want to do an evolution entry?" Don't produce the entry — just suggest it, once, naturally. Keep modes distinct.`
     : '';
 
-  return [identity, context, stateDoc, goalsFull_, goalsSummary, patterns, chatInsights, peopleNotes, evolution, recentContext, incompleteCtx, reviewInstructions, goalsSummaryUpdate, peopleNotesUpdate, peopleUpdate, evolutionSuggestion]
+  return [identity, context, sessionType, stateDoc, goalsSummary, patterns, chatInsights, peopleNotes, evolution, recentContext, incompleteCtx, reviewInstructions, goalsSummaryUpdate, peopleNotesUpdate, peopleUpdate, evolutionSuggestion]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -731,10 +731,7 @@ async function initReviewMode() {
   document.getElementById('chat').innerHTML = '';
   showDots();
 
-  const [goalsFull, reviewLog] = await Promise.all([
-    fetchGoalsFull(),
-    fetchReviewLog(),
-  ]);
+  const reviewLog = await fetchReviewLog();
   S.reviewLog    = reviewLog;
   S.existingReview = reviewLog;
 
@@ -745,7 +742,7 @@ async function initReviewMode() {
     incompleteBlock = lastIdx === -1 ? reviewLog : reviewLog.slice(lastIdx + 1);
   }
 
-  const sysPrompt = buildReviewPrompt(goalsFull, incompleteBlock);
+  const sysPrompt = buildReviewPrompt(incompleteBlock);
 
   try {
     const openingContent = incomplete
