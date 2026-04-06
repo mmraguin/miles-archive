@@ -8,8 +8,7 @@ This file tracks feature status and planned work. Update it when features ship, 
 
 ## In Progress
 
-*(nothing currently)*
-
+- [ ] Edit notes in miles-data/notes to reflect reverse chronological order logging.
 ---
 
 ## Planned
