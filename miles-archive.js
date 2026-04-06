@@ -160,6 +160,9 @@ function buildSysPrompt() {
   // ── Section: Graymatter trend (parsed from recent entries)
   const graymatterTrend = buildGraymatterTrend(S.recentEntries);
 
+  // ── Section: Reflection trend (parsed from recent entries)
+  const reflectionTrend = buildReflectionTrend(S.recentEntries);
+
   // ── Section: Trend awareness
   const trendAwareness = (S.recentEntries.length || S.stateOfMiles) ? `TREND AWARENESS
 You have recent scores, entry narratives, goals, and accumulated patterns. Use them — don't wait to be asked.
@@ -217,6 +220,23 @@ TRUTH OVER COMFORT
 
   // ── Section: Brief mode
   const briefMode = S.brief ? `\nBRIEF MODE ACTIVE: 2–3 exchanges max before moving to numbers. Skip extended follow-ups. Match her energy — keep it short.\n` : '';
+
+  // ── Section: Reflection elicitation
+  const reflectionElicitation = `REFLECTION ELICITATION
+Gratitude, wins, and a memory are captured in every daily entry. Infer these from the session organically — don't wait for Miles to name them.
+
+Gratitude: listen for moments of appreciation, relief, connection, or delight.
+Wins: listen for things Miles did, completed, handled, or moved forward — size doesn't matter.
+Memory: identify one specific moment — an image, feeling, or exchange — worth holding onto.
+
+Before writing the entry, confirm your inferences conversationally. One brief question at a time:
+  "I'm thinking [X] as your memory for today — does that feel right, or is there another moment?"
+  "I'd count [Y] as a win — agree?"
+  "I'm picking up [Z] as something you're grateful for — anything to add or swap?"
+
+If the session didn't surface enough signal for any field, ask directly near session end — briefly and warmly, not as a checklist.
+
+Never fabricate. If Miles explicitly has nothing for a field, note it briefly or omit the item. Always include at least one of each when the session has enough substance.`;
 
   // ── Section: Graymatter
   const graymatter = `GRAYMATTER FIELDS
@@ -288,6 +308,12 @@ graymatter:
   alcohol: true/false
   wind_down: true/false
 flags: []
+reflection:
+  gratitude:
+    - "[specific thing — not generic]"
+  wins:
+    - "[something Miles did, completed, or moved forward — small is fine]"
+  memory: "[one sentence — a moment, image, or feeling worth holding]"
 ---
 
 ## Health
@@ -321,6 +347,17 @@ flags: []
 
 ## Notes
 [Notability content or stray thoughts. Omit if none.]
+
+## Reflection
+
+**Gratitude**
+- [specific item]
+
+**Wins**
+- [specific win]
+
+**Memory**
+[one sentence]
 <<<ENTRY_END>>>
 
 Notes on the format: YAML and markdown sections are both present — YAML for machine retrieval, markdown for human reading. No date in section headers. For same-day continuation: produce one merged entry covering the full day; it will overwrite the existing file.
@@ -613,11 +650,38 @@ last_updated: ${date}
 
 Skip if: routine numbers session, Miles is clearly exhausted or in brief mode, not enough to synthesize into a genuine phase observation.` : '';
 
+  // ── Section: Reflections log update instructions
+  const reflectionsUpdate = `REFLECTIONS LOG UPDATES
+After producing the journal entry, always output the new reflection block for notes/reflections.md:
+
+<<<REFLECTIONS_START>>>
+## [[${date}]]
+
+**Gratitude**
+- [[wikilinked person or theme]] #gratitude
+
+**Wins**
+- [[wikilinked win or goal zone]] #win
+
+**Memory**
+> One sentence. #memory
+<<<REFLECTIONS_END>>>
+
+Wikilink rules — wrap in [[double brackets]]:
+- Named people → [[First Name]] (match people-profile.md names)
+- Goal zones → [[Health]], [[Relationships]], [[Creative Work]], [[Finance]], etc.
+- Recurring themes → [[rest]], [[connection]], [[pain]], [[clarity]], [[small wins]], etc. — infer from context
+- Dates → [[YYYY-MM-DD]] format only
+
+The YAML frontmatter reflection: block uses plain text (no wikilinks). This block is the Obsidian-optimized version — wikilink everything meaningful.
+Multiple gratitude items and wins are fine (1–3 each). Memory is always exactly one sentence.
+Always emit this block after every daily entry — it is not optional.`;
+
   // ── Section: Language + notability
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, trendAwareness, fetchDeep, coaching, reviewOverdue, briefMode, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -652,6 +716,13 @@ Last updated: ${date}
 Date format: use [[YYYY-MM-DD]] wikilink format for all dates in the output.
 
 If nothing warrants updating, output exactly: NO_UPDATE
+
+REFLECTION PATTERNS
+If today's reflection data (gratitude, wins, memory from the session) reveals a theme emerging across sessions, track it:
+- Gratitude repeatedly mentions a person → note relational pattern (## Relationship / [Name] or relevant section)
+- Wins cluster in a goal zone → note momentum (## Actively Working On or ## In Progress)
+- Memory entries share a tone (quiet, connection, achievement) → name the pattern in ## Mood Patterns or ## Completed Milestones
+Only add if the theme has appeared 3+ times. Use standard confirmation format.
 
 WHAT TO OUTPUT (changed sections only):
 - ## Open Threads — if any thread was opened, closed/resolved, or updated today
@@ -1179,6 +1250,13 @@ function extractGoalsSummary(txt) {
   return txt.slice(s + 25, e).trim();
 }
 
+function extractReflections(txt) {
+  const s = txt.indexOf('<<<REFLECTIONS_START>>>');
+  const e = txt.indexOf('<<<REFLECTIONS_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 23, e).trim();
+}
+
 function extractReview(txt) {
   const s = txt.indexOf('<<<REVIEW_START>>>');
   const e = txt.indexOf('<<<REVIEW_END>>>');
@@ -1274,6 +1352,8 @@ async function saveEntry() {
         const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      } else if (S._queuedReflections) {
+        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
       }
     }, 2400);
   } catch(err) {
@@ -1298,6 +1378,8 @@ function dismissSave() {
     const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  } else if (S._queuedReflections) {
+    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
   }
 }
 
@@ -1392,6 +1474,8 @@ function dismissPatterns() {
     const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  } else if (S._queuedReflections) {
+    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
   }
 }
 
@@ -1443,6 +1527,8 @@ async function savePatterns() {
         const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      } else if (S._queuedReflections) {
+        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
       }
     }, 2400);
   } catch(err) {
@@ -1476,6 +1562,8 @@ function dismissGoalsSummary() {
     const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  } else if (S._queuedReflections) {
+    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
   }
 }
 
@@ -1525,6 +1613,8 @@ async function saveGoalsSummary() {
         const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      } else if (S._queuedReflections) {
+        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
       }
     }, 2400);
   } catch(err) {
@@ -1556,6 +1646,8 @@ function dismissInsights() {
     const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  } else if (S._queuedReflections) {
+    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
   }
 }
 
@@ -1603,6 +1695,8 @@ async function saveInsights() {
         const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      } else if (S._queuedReflections) {
+        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
       }
     }, 2400);
   } catch(err) {
@@ -1632,6 +1726,8 @@ function dismissPeople() {
     const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
   } else if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  } else if (S._queuedReflections) {
+    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
   }
 }
 
@@ -1666,6 +1762,8 @@ async function savePeople() {
         const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
       } else if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      } else if (S._queuedReflections) {
+        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
       }
     }, 2400);
   } catch(err) {
@@ -1693,6 +1791,8 @@ function dismissPeopleNotes() {
   document.getElementById('people-notes-st').className = '';
   if (S._queuedEvolution) {
     const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+  } else if (S._queuedReflections) {
+    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
   }
 }
 
@@ -1725,6 +1825,8 @@ async function savePeopleNotes() {
       document.getElementById('people-notes-st').className = '';
       if (S._queuedEvolution) {
         const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
+      } else if (S._queuedReflections) {
+        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
       }
     }, 2400);
   } catch(err) {
@@ -1830,6 +1932,9 @@ function dismissEvolution() {
   S.pendingEvolution = null;
   document.getElementById('evo-bar').classList.remove('show');
   document.getElementById('evo-st').className = '';
+  if (S._queuedReflections) {
+    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
+  }
 }
 
 async function saveEvolution() {
@@ -1861,9 +1966,82 @@ async function saveEvolution() {
     setTimeout(() => {
       document.getElementById('evo-bar').classList.remove('show');
       document.getElementById('evo-st').className = '';
+      if (S._queuedReflections) {
+        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
+      }
     }, 2400);
   } catch(err) {
     setEvoSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
+// ── Reflections log save ──────────────────────────────────────────────────────
+function setReflectionsSt(type, txt) {
+  const e = document.getElementById('reflections-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showReflectionsBar(content) {
+  S.pendingReflections = content;
+  document.getElementById('reflections-go').disabled = false;
+  document.getElementById('reflections-st').className = '';
+  document.getElementById('reflections-bar').classList.add('show');
+}
+
+function dismissReflections() {
+  S.pendingReflections = null;
+  document.getElementById('reflections-bar').classList.remove('show');
+  document.getElementById('reflections-st').className = '';
+}
+
+function mergeReflectionsUpdate(currentDoc, newEntry) {
+  const date = S.sessionDate;
+  if (!currentDoc) {
+    // First write — build the full file
+    return `---\ntags: [reflections]\n---\n\n# Reflections Log\n\n*Last updated: [[${date}]]*\n\n---\n\n${newEntry}\n`;
+  }
+  // Update last-updated date
+  let doc = currentDoc.replace(/\*Last updated: \[\[\d{4}-\d{2}-\d{2}\]\]\*/, `*Last updated: [[${date}]]*`);
+  // Insert new entry after the first --- separator that follows the header
+  const luIdx = doc.indexOf('*Last updated:');
+  const hrIdx = doc.indexOf('\n---', luIdx !== -1 ? luIdx : 0);
+  if (hrIdx === -1) return doc.trimEnd() + '\n\n---\n\n' + newEntry + '\n';
+  const insertAt = hrIdx + '\n---'.length;
+  return doc.slice(0, insertAt) + '\n\n' + newEntry + '\n\n---' + doc.slice(insertAt);
+}
+
+async function saveReflections() {
+  if (!S.pendingReflections) return;
+  const btn = document.getElementById('reflections-go');
+  btn.disabled = true;
+  setReflectionsSt('info', 'writing…');
+  try {
+    const path = 'notes/reflections.md';
+    const { sha, content: existing } = await getFileInfo(path);
+    const merged = mergeReflectionsUpdate(existing, S.pendingReflections);
+    const body = { message: 'reflections: update notes/reflections.md', content: b64Encode(merged) };
+    if (sha) body.sha = sha;
+    const r = await fetch(
+      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+    );
+    if (!r.ok) {
+      if (r.status === 401) throw new Error('github_401');
+      if (r.status === 403) throw new Error('github_403');
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.message || `GitHub error ${r.status}`);
+    }
+    S.reflections = merged;
+    setReflectionsSt('ok', 'saved');
+    addSys('reflections updated → notes/reflections.md');
+    S.pendingReflections = null;
+    setTimeout(() => {
+      document.getElementById('reflections-bar').classList.remove('show');
+      document.getElementById('reflections-st').className = '';
+    }, 2400);
+  } catch(err) {
+    setReflectionsSt('err', friendlyError(err));
     btn.disabled = false;
   }
 }
@@ -1945,6 +2123,7 @@ async function sendMsg() {
     const people       = extractPeople(reply);
     const peopleNotes  = extractPeopleNotes(reply);
     const evolution    = extractEvolution(reply);
+    const reflections  = extractReflections(reply);
     const deepFetch = reply.includes('<<<FETCH_DEEP>>>');
     // Strip all markers from displayed text
     let disp = reply;
@@ -1957,6 +2136,7 @@ async function sendMsg() {
     if (people)       disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
     if (peopleNotes)  disp = disp.replace(/<<<PEOPLE_NOTES_START>>>[\s\S]*?<<<PEOPLE_NOTES_END>>>/g, '').trim();
     if (evolution)    disp = disp.replace(/<<<EVOLUTION_START>>>[\s\S]*?<<<EVOLUTION_END>>>/g, '').trim();
+    if (reflections)  disp = disp.replace(/<<<REFLECTIONS_START>>>[\s\S]*?<<<REFLECTIONS_END>>>/g, '').trim();
     disp = disp.replace(/<<<FETCH_DEEP>>>/g, '').trim();
     addMsg('assistant', disp || 'Done.');
     S.messages.push({ role: 'assistant', content: reply });
@@ -1964,7 +2144,7 @@ async function sendMsg() {
     if (state) showStateBar(state);
     // First bar in cascade: review bar (review mode) or entry bar (daily mode)
     const firstBar = S.reviewMode ? review : entry;
-    // Queue order (daily):  entry → patterns → goals-summary → insights → people → people-notes → evolution
+    // Queue order (daily):  entry → patterns → goals-summary → insights → people → people-notes → evolution → reflections
     // Queue order (review): review → goals-summary → people-notes → people-profile
     if (patterns) {
       if (firstBar) S._queuedPatterns = patterns;
@@ -1989,6 +2169,10 @@ async function sendMsg() {
     if (evolution) {
       if (firstBar || patterns || goalsSummary || insights || people || peopleNotes) S._queuedEvolution = evolution;
       else showEvoBar(evolution);
+    }
+    if (reflections) {
+      if (firstBar || patterns || goalsSummary || insights || people || peopleNotes || evolution) S._queuedReflections = reflections;
+      else showReflectionsBar(reflections);
     }
     if (review) showReviewBar(review);
     else if (entry) showSaveBar(entry, detectType(reply));
@@ -2037,6 +2221,7 @@ function _clearAndStart() {
   S.peopleProfile = null; S.pendingPeople = null; S._queuedPeople = null;
   S.peopleNotes = null; S.pendingPeopleNotes = null; S._queuedPeopleNotes = null;
   S.evolution = null; S.pendingEvolution = null; S.evoTrigger = false; S._queuedEvolution = null;
+  S.reflections = null; S.pendingReflections = null; S._queuedReflections = null;
   S.reviewMode = false; S.pendingReview = null; S.existingReview = null; S.reviewLog = null;
   S._reviewFired = false; S._reviewRunning = false;
   document.getElementById('pat-bar').classList.remove('show');
@@ -2053,6 +2238,8 @@ function _clearAndStart() {
   document.getElementById('people-notes-st').className = '';
   document.getElementById('evo-bar').classList.remove('show');
   document.getElementById('evo-st').className = '';
+  document.getElementById('reflections-bar').classList.remove('show');
+  document.getElementById('reflections-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
   document.getElementById('review-btn').classList.remove('on');
   document.getElementById('review-bar').classList.remove('show');
@@ -2125,8 +2312,9 @@ function fetchPatterns()      { return fetchEntry('notes/patterns.md'); }
 function fetchChatInsights()  { return fetchEntry('notes/chat-insights.md'); }
 function fetchPeopleProfile() { return fetchEntry('notes/people-profile.md'); }
 function fetchPeopleNotes()   { return fetchEntry('notes/people-notes.md'); }
-function fetchEvolution()     { return fetchEntry('notes/evolution.md'); }
-function fetchReviewLog()     { return fetchEntry('goals/review-log.md'); }
+function fetchEvolution()      { return fetchEntry('notes/evolution.md'); }
+function fetchReflections()    { return fetchEntry('notes/reflections.md'); }
+function fetchReviewLog()      { return fetchEntry('goals/review-log.md'); }
 function fetchGoalsCurrent()  { return fetchEntry('goals/current.md'); }
 
 function parseEvolutionDate(content) {
@@ -2246,6 +2434,45 @@ function parseGraymatter(content) {
   return Object.keys(scores).length ? scores : null;
 }
 
+// ── Parse reflection block from YAML frontmatter ─────────────────────────────
+function parseReflection(content) {
+  const fm = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fm) return null;
+  const yaml = fm[1];
+  const refIdx = yaml.indexOf('reflection:');
+  if (refIdx === -1) return null;
+  const block = yaml.slice(refIdx);
+
+  const gratitude = [];
+  const gratMatch = block.match(/gratitude:\s*\n((?:[ \t]+-[^\n]*\n?)+)/);
+  if (gratMatch) {
+    for (const m of gratMatch[1].matchAll(/- (.+)/g)) gratitude.push(m[1].trim().replace(/^"|"$/g, ''));
+  }
+  const wins = [];
+  const winsMatch = block.match(/wins:\s*\n((?:[ \t]+-[^\n]*\n?)+)/);
+  if (winsMatch) {
+    for (const m of winsMatch[1].matchAll(/- (.+)/g)) wins.push(m[1].trim().replace(/^"|"$/g, ''));
+  }
+  const memMatch = block.match(/memory:\s*"?([^"\n]+)"?/);
+  const memory = memMatch ? memMatch[1].trim() : null;
+
+  return (gratitude.length || wins.length || memory) ? { gratitude, wins, memory } : null;
+}
+
+// ── Build reflection trend string for system prompt ───────────────────────────
+function buildReflectionTrend(entries) {
+  const rows = entries
+    .map(e => ({ date: e.date, r: parseReflection(e.content) }))
+    .filter(e => e.r);
+  if (!rows.length) return '';
+  const lines = rows.map(({ date, r }) => {
+    const g = r.gratitude.slice(0, 2).join('; ') || '—';
+    const w = r.wins.slice(0, 1)[0] || '—';
+    return `${date}: grateful for [${g}] · win: [${w}] · memory: [${r.memory || '—'}]`;
+  });
+  return `RECENT REFLECTION (last ${rows.length} days)\n${lines.join('\n')}`;
+}
+
 // ── Build graymatter trend string for system prompt ───────────────────────────
 function buildGraymatterTrend(entries) {
   const rows = entries
@@ -2260,7 +2487,7 @@ function buildGraymatterTrend(entries) {
 
 // ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
-  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
+  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reflections, reviewLog] = await Promise.all([
     fetchRecentEntries(),
     fetchStateOfMiles(),
     fetchGoals(),
@@ -2269,6 +2496,7 @@ async function loadSessionContext() {
     fetchPeopleProfile(),
     fetchPeopleNotes(),
     fetchEvolution(),
+    fetchReflections(),
     fetchReviewLog(),
   ]);
   S.recentEntries = recentEntries;
@@ -2279,6 +2507,7 @@ async function loadSessionContext() {
   S.peopleProfile = peopleProfile;
   S.peopleNotes   = peopleNotes;
   S.evolution     = evolution;
+  S.reflections   = reflections;
   S.reviewLog     = reviewLog;
   S.evoTrigger    = _computeEvoTrigger(evolution);
   if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }
@@ -2294,8 +2523,8 @@ async function startSess() {
   const h = hourManila();
   const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
 
-  // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + review log in parallel
-  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
+  // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + reflections + review log in parallel
+  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reflections, reviewLog] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(),
     fetchStateOfMiles(),
@@ -2305,6 +2534,7 @@ async function startSess() {
     fetchPeopleProfile(),
     fetchPeopleNotes(),
     fetchEvolution(),
+    fetchReflections(),
     fetchReviewLog(),
   ]);
   S.existingEntry  = existing;
@@ -2316,6 +2546,7 @@ async function startSess() {
   S.peopleProfile  = peopleProfile;
   S.peopleNotes    = peopleNotes;
   S.evolution      = evolution;
+  S.reflections    = reflections;
   S.reviewLog      = reviewLog;
   S.evoTrigger     = _computeEvoTrigger(evolution);
   if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }

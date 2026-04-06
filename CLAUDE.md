@@ -1,6 +1,6 @@
 # miles-archive — Project Reference
 
-*Last updated: April 6, 2026. All planned features shipped. patterns.md restructured to 28 flat `##` sections with bold group labels; all notes/ dates now `[[YYYY-MM-DD]]` wikilink format; chat-insights Return Threads now `[[#Section Name|label]]` format. App prompts updated to match.*
+*Last updated: April 6, 2026. All planned features shipped. patterns.md restructured to 28 flat `##` sections with bold group labels; all notes/ dates now `[[YYYY-MM-DD]]` wikilink format; chat-insights Return Threads now `[[#Section Name|label]]` format. Daily reflection tracking added (gratitude, wins, memory) — YAML frontmatter + `## Reflection` section + `notes/reflections.md` running log. App prompts updated to match.*
 
 ---
 
@@ -145,6 +145,9 @@ const S = {
   evoTrigger:            false, // whether evolution entry should be prompted this session
   _queuedPeople:         null,  // people update queued after patterns bar clears
   _queuedEvolution:      null,  // evolution update queued after people bar clears
+  reflections:           null,  // fetched from notes/reflections.md
+  pendingReflections:    null,  // reflections entry pending save
+  _queuedReflections:    null,  // reflections queued after evolution bar clears
   _reviewFired:          false, // prevents duplicate post-save review calls per session
   _reviewRunning:        false, // true while background patterns review call is in flight
 };
@@ -157,7 +160,7 @@ const S = {
 `buildSysPrompt()` joins sections with `\n\n`, filtered for truthiness:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → trendAwareness → fetchDeep → coaching → reviewOverdue → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → fetchDeep → coaching → reviewOverdue → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionElicitation → reflectionsUpdate → misc
 ```
 
 `stateDoc` is fetched from `notes/state-of-miles.md` at session start. Update whenever health context changes — diagnoses, meds, labs, open threads. Sat/Sun medication reminders injected here.
@@ -170,7 +173,13 @@ identity → context → stateDoc → goalsContext → patternsContext → chatI
 
 `peopleContext` is fetched from `notes/people-profile.md` — YAML ledger of people in Miles's life. Claude updates it via `<<<PEOPLE_START>>>` / `<<<PEOPLE_END>>>` markers when named people are mentioned. Queued to save after patterns bar. Dashboard reads this for the Inner Circle section.
 
-`evolutionUpdate` is injected only when 90+ days have passed since the last evolution entry (or no entry exists), and at least 7 days since last offered. Claude writes a life phase summary via `<<<EVOLUTION_START>>>` / `<<<EVOLUTION_END>>>` markers. Queued last in the save chain. Dashboard reads this for the Evolution section.
+`evolutionUpdate` is injected only when 90+ days have passed since the last evolution entry (or no entry exists), and at least 7 days since last offered. Claude writes a life phase summary via `<<<EVOLUTION_START>>>` / `<<<EVOLUTION_END>>>` markers. Dashboard reads this for the Evolution section.
+
+`reflectionTrend` is built by `buildReflectionTrend()` from `parseReflection()` output on the last 3 daily entries — compact 3-line context string showing what Miles was grateful for, what she won, and what she remembered each day. Injected after `graymatterTrend`.
+
+`reflectionElicitation` instructs Claude to infer gratitude/wins/memory organically from the session narrative, confirm each with Miles conversationally before writing the entry, and ask directly (briefly, warmly) if signal is missing. Never fabricate.
+
+`reflectionsUpdate` provides the `<<<REFLECTIONS_START>>>` / `<<<REFLECTIONS_END>>>` template with wikilink rules: people → `[[First Name]]`, goal zones → `[[Health]]` etc., recurring themes → `[[rest]]` etc., dates → `[[YYYY-MM-DD]]`. Tags: `#gratitude`, `#win`, `#memory` on each item. Queued last in the save chain, after evolution.
 
 `recentContext` is the last 3 daily entries, **compressed** (YAML frontmatter + first paragraph of Narrative only, ~300 tokens per entry). Gives Claude scores and narrative thread without full entry weight.
 
@@ -225,7 +234,7 @@ Save bars queue in order. Each bar shows only after the previous is saved or dis
 
 **Daily mode:**
 ```
-entry → patterns → goals-summary → insights → people → people-notes → evolution
+entry → patterns → goals-summary → insights → people → people-notes → evolution → reflections
 ```
 
 **Review mode:**
@@ -239,7 +248,8 @@ review → goals-summary → people-notes → people-profile
 - Insights bar: queued via `S._queuedInsights` if entry, patterns, or goals-summary is present; lavender (`#a78bfa`) accent
 - People-notes bar: queued via `S._queuedPeopleNotes` after people; rose accent
 - People bar: queued via `S._queuedPeople` if earlier bars are present
-- Evolution bar: queued via `S._queuedEvolution` — always last in daily mode
+- Evolution bar: queued via `S._queuedEvolution` after people-notes
+- Reflections bar: queued via `S._queuedReflections` — always last in daily mode; saves to `notes/reflections.md` via merge (prepend-only)
 
 If only one type is present (e.g. people with no entry), it shows immediately.
 
@@ -334,6 +344,12 @@ graymatter:
   medications: true/false
   alcohol: true/false
   wind_down: true/false
+reflection:
+  gratitude:
+    - "[specific item — not generic]"
+  wins:
+    - "[something Miles did, completed, or moved forward — small is fine]"
+  memory: "[one sentence — a moment, image, or feeling worth holding]"
 flags: []
 ---
 
@@ -348,6 +364,16 @@ flags: []
 
 ## Notes
 [optional]
+
+## Reflection
+**Gratitude**
+- [specific item]
+
+**Wins**
+- [specific win]
+
+**Memory**
+[one sentence]
 ```
 
 YAML and markdown sections are intentionally both present — YAML for machine retrieval, markdown for human reading. No date in section headers. For same-day continuation, Claude produces one merged entry and it overwrites the existing file wholesale.
