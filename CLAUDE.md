@@ -1,6 +1,6 @@
 # miles-archive — Project Reference
 
-*Last updated: April 5, 2026. All planned features shipped (Review Mode, Goals Summary, People Notes, Evolution optimization, Dashboard tone). Session summary depth increased (20 msgs × 800 chars). Chat-insights anchor integrity rules added. Goals-summary trajectory markers + contradiction trigger added. Review mode goalsSummary instruction strengthened.*
+*Last updated: April 6, 2026. All planned features shipped. patterns.md restructured to 28 flat `##` sections with bold group labels; all notes/ dates now `[[YYYY-MM-DD]]` wikilink format; chat-insights Return Threads now `[[#Section Name|label]]` format. App prompts updated to match.*
 
 ---
 

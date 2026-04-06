@@ -1,6 +1,6 @@
 # miles-archive — Roadmap
 
-*Last updated: 2026-04-05*
+*Last updated: 2026-04-06*
 
 This file tracks feature status and planned work. Update it when features ship, stall, or get scoped. Each entry links to its spec section below when implementation details exist.
 
@@ -52,6 +52,7 @@ This file tracks feature status and planned work. Update it when features ship, 
 - [x] **Evolution optimization** — entry quality prompt draws from patterns + people-notes + state-of-miles; post-review evolution suggestion when 90+ days since last entry; dashboard shows last evolution date in section header *(Apr 5, 2026)*
 - [x] **Auto-update patterns.md** — `triggerPostEntryReview()` fires after every entry save (and review save). Separate focused API call (Sonnet, 3500 tokens) with merge-mode output: only changed sections output, `mergePatternsUpdate()` splices them into existing doc. Silent fail; user confirms before save. ~$0.019/session. *(Apr 5, 2026)*
 - [x] **System prompt + data file audit** — chat-insights anchor integrity rule added (Return Threads must match existing ## sections); `## Open Threads` naming bug fixed; session summary depth increased (12→20 msgs, 500→800 chars); goals-summary trajectory markers added (locked vocabulary); contradiction trigger added to daily goals-summary update logic; review mode goalsSummary instruction strengthened to produce quarter-specific lines + Review Log Summary section. Data files repaired: review-log.md paragraph breaks, typo, bullet formatting, PWD card contradiction; chat-insights orphaned Return Threads removed/resolved, missing sections created; goals-summary rewritten with Q2-specific active focuses. *(Apr 5, 2026)*
+- [x] **patterns.md restructure + Obsidian wikilinks** — flattened from 6 `##`/`###` hierarchy to 28 flat `##` sections with bold group labels (**HEALTH**, **BEHAVIORAL**, **EMOTIONAL**, **GOALS**, **WINS**, **THREADS**); each section is now an independent merge unit; `## Declined` stub added for new-section insertion; all notes/ dates converted to `[[YYYY-MM-DD]]` wikilink format; chat-insights Return Threads converted to `[[#Section Name|label]]`; app prompts updated to produce new structure and date format *(Apr 6, 2026)*
 
 ---
 
