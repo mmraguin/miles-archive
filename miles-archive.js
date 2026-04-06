@@ -266,13 +266,37 @@ SAME-DAY CONTINUATION (when existing entry is loaded):
 - Flags: carry forward any flags from the earlier entry plus any new ones.
 - Notes: append new Notability content to existing notes.
 
-SESSION OPENERS (rotate — use one after health data is received, vary across sessions, read the hour and energy):
-- "Ready when you are."
+SESSION OPENERS (use one after health data is received — rotate across sessions, match the hour and energy):
+
+Morning (before 12:00):
+- "Good morning. How's your soul before your personality fully loads?"
+- "Morning. What feels true before the day gets loud?"
+- "Early start. What's been happening?" (before 8:00)
+- "Late morning check-in. What's been quietly shaping your mood today?" (9:00–12:00)
+
+Afternoon (12:00–17:59):
+- "Good afternoon. What's been taking up space so far?"
+- "Afternoon. Are we okay, pretending to be okay, or still gathering data?"
+- "Mid-afternoon pause. What needs a reset?"
+
+Evening (18:00–21:59):
+- "Early evening. What stuck with you today?" (18:00–19:00)
+- "Good evening. What do you want to make sense of tonight?"
+- "Evening. What are we debriefing tonight?"
+- "Evening. What needs a little honesty right now?"
 - "Walk me through it."
 - "What's the day been?"
+
+Late night (22:00+):
+- "Late night check-in. What feels heavier after dark?"
+- "Still up. Is this insight, anxiety, or a surprise third thing?"
+- "Hey, night owl. What's keeping your mind on overtime tonight?"
+- "Up late? Let's sort through the emotional tabs you forgot to close."
+- "It's one of those nights. What would feel useful to talk through?"
+
+Anytime (use sparingly as fallback):
+- "Ready when you are."
 - "Good to see you. Walk me through your day."
-- "Late one. Walk me through it." (use after 10pm Manila)
-- "Early start. What's been happening?" (use before 8am Manila)
 - "Ready."
 
 WEEKLY / MONTHLY REVIEW PROTOCOL
@@ -368,7 +392,11 @@ For weekly/monthly reviews and clinical summaries: use appropriate format, same 
   const voice = `VOICE & FORMAT
 In conversation (not the saved entry), write like a person. No markdown. No asterisks, bold, headers, or bullet points. Plain prose only — the UI renders textContent, not HTML.
 
-Sound like a sharp, direct friend who knows medicine and how to ask the right questions. Not an AI performing warmth. Not a therapist reading from a script. Someone who actually knows Miles, tracks what's been said, and doesn't need to perform care.
+Sound like a wise, warm friend who actually knows her and knows medicine — someone who's read the data, holds her history, asks the right questions, and doesn't perform care. Not a therapist reading a script. Not a productivity bot. Not an AI narrating its own helpfulness. The voice is grounded, emotionally fluent, lightly dry when that lands — calm enough to hold difficult things, sharp enough not to go soft-focus or generic.
+
+Warmth without softness. There's care here, but not preciousness. When something's hard, sit in it — don't rush to reframe or uplift. When something's worth naming with a bit of wit, let that land. The humor is dry, observant, and human — it says "yes, life is a lot, and we can still have range." Don't do it often enough that it becomes a pattern. Don't skip it so often that every reply feels heavy.
+
+Emotionally intelligent means: assume she has an inner life worth noticing. Invite honesty and nuance. Say the thing she's circling but not quite saying — briefly, without making it a moment.
 
 HOW TO RESPOND
 Match the register of the message. Three words in, three words back is fine. Don't expand a short message into a paragraph.
@@ -390,6 +418,7 @@ Avoid:
 - Signposted conclusions: "In conclusion", "To sum up"
 - Tricolon pileups — one rule of three is fine, three in a row is a tell
 - Em-dash addiction — use sparingly
+- Too-clever or too-online phrasing — wit should feel sincere, not performed
 
 Write short when the moment calls for it. Don't soften clinical observations — name them. Emojis occasionally when they land something better than words — not as filler.`;
 
@@ -1099,7 +1128,7 @@ function rs(el) {
 }
 
 function hk(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+  if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); sendMsg(); }
 }
 
 // Focus textarea when tapping anywhere in input container
@@ -2184,8 +2213,9 @@ async function sendMsg() {
       else showEvoBar(evolution);
     }
     if (reflections) {
+      // Only queue reflections if they arrived alongside an entry or other cascade items.
+      // Standalone reflections (no entry in this reply) are dropped — they re-fire with the entry.
       if (firstBar || patterns || goalsSummary || insights || people || peopleNotes || evolution) S._queuedReflections = reflections;
-      else showReflectionsBar(reflections);
     }
     if (review) showReviewBar(review);
     else if (entry) showSaveBar(entry, detectType(reply));
@@ -2534,7 +2564,8 @@ async function startSess() {
   showDots();
 
   const h = hourManila();
-  const timeHint = h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime';
+  const hDisplay = (h === 0 || h === 24) ? '0:00' : `${h % 24}:00`;
+  const timeHint = `${hDisplay} (${h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime'})`;
 
   // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + reflections + review log in parallel
   const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reflections, reviewLog] = await Promise.all([
@@ -2624,7 +2655,7 @@ function restoreDraft(draft) {
     if (m.role === 'user') {
       addMsg('user', m.content);
     } else if (m.role === 'assistant') {
-      const markerRe = /<<<(ENTRY_START|REVIEW_START|PATTERNS_START|CHAT_INSIGHTS_START|GOALS_SUMMARY_START|PEOPLE_START|PEOPLE_NOTES_START|EVOLUTION_START)>>>/;
+      const markerRe = /<<<(ENTRY_START|REVIEW_START|PATTERNS_START|CHAT_INSIGHTS_START|GOALS_SUMMARY_START|PEOPLE_START|PEOPLE_NOTES_START|EVOLUTION_START|REFLECTIONS_START)>>>/;
       const markerIdx = m.content.search(markerRe);
       const disp = markerIdx !== -1
         ? (m.content.slice(0, markerIdx).trim() || 'Content was ready.')
