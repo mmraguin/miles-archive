@@ -1,6 +1,6 @@
 # miles-archive — Project Reference
 
-*Last updated: April 6, 2026. All planned features shipped. patterns.md restructured to 28 flat `##` sections with bold group labels; all notes/ dates now `[[YYYY-MM-DD]]` wikilink format; chat-insights Return Threads now `[[#Section Name|label]]` format. Daily reflection tracking added (gratitude, wins, memory) — YAML frontmatter + `## Reflection` section + `notes/reflections.md` running log. App prompts updated to match.*
+*Last updated: April 6, 2026. All notes files now use reverse-chronological ordering (newest first). reflections.md restructured from per-day entries to three type sections (## Gratitude, ## Wins, ## Memory) — one item per session per type; `mergeReflectionsUpdate()` prepends to each section. chat-insights entries now prepend to section tops. patterns.md list sections (Journal Entry Wins, Completed Milestones, In Progress, Open Threads, Declined) ordered newest first.*
 
 ---
 
@@ -169,7 +169,7 @@ identity → context → stateDoc → goalsContext → patternsContext → chatI
 
 `patternsContext` is fetched from `notes/patterns.md` — Claude's accumulated observations across sessions. Injected as context; Claude uses it without referencing it directly. Updated two ways: (1) Claude may output markers in the main session reply; (2) `triggerPostEntryReview()` fires a background call after every entry or review save using `buildPatternsReviewPrompt()` with merge-mode output (only changed sections). Miles confirms before saving either way.
 
-`chatInsightsContext` is fetched from `notes/chat-insights.md` — named observations, open threads, and reflective insights captured across sessions. Claude updates it via `<<<CHAT_INSIGHTS_START>>>` / `<<<CHAT_INSIGHTS_END>>>` markers when a named experience surfaces, a realization is articulated, or Miles signals something is worth keeping. Claude infers intent — no special syntax required. Queued to save after patterns bar in the cascade.
+`chatInsightsContext` is fetched from `notes/chat-insights.md` — named observations, open threads, and reflective insights captured across sessions. Claude updates it via `<<<CHAT_INSIGHTS_START>>>` / `<<<CHAT_INSIGHTS_END>>>` markers when a named experience surfaces, a realization is articulated, or Miles signals something is worth keeping. New entries prepend to the top of their section (newest first). Claude infers intent — no special syntax required. Queued to save after patterns bar in the cascade.
 
 `peopleContext` is fetched from `notes/people-profile.md` — YAML ledger of people in Miles's life. Claude updates it via `<<<PEOPLE_START>>>` / `<<<PEOPLE_END>>>` markers when named people are mentioned. Queued to save after patterns bar. Dashboard reads this for the Inner Circle section.
 
@@ -179,7 +179,7 @@ identity → context → stateDoc → goalsContext → patternsContext → chatI
 
 `reflectionElicitation` instructs Claude to infer gratitude/wins/memory organically from the session narrative, confirm each with Miles conversationally before writing the entry, and ask directly (briefly, warmly) if signal is missing. Never fabricate.
 
-`reflectionsUpdate` provides the `<<<REFLECTIONS_START>>>` / `<<<REFLECTIONS_END>>>` template with wikilink rules: people → `[[First Name]]`, goal zones → `[[Health]]` etc., recurring themes → `[[rest]]` etc., dates → `[[YYYY-MM-DD]]`. Tags: `#gratitude`, `#win`, `#memory` on each item. Queued last in the save chain, after evolution.
+`reflectionsUpdate` provides the `<<<REFLECTIONS_START>>>` / `<<<REFLECTIONS_END>>>` template. Claude outputs exactly three lines (one per type: `#gratitude`, `#win`, `#memory`), each prefixed with `[[YYYY-MM-DD]]` and wikilinked content — one item per type, specificity over quantity. `mergeReflectionsUpdate()` prepends each line to its section (`## Gratitude`, `## Wins`, `## Memory`) — newest first. Queued last in the save chain, after evolution.
 
 `recentContext` is the last 3 daily entries, **compressed** (YAML frontmatter + first paragraph of Narrative only, ~300 tokens per entry). Gives Claude scores and narrative thread without full entry weight.
 
@@ -405,8 +405,9 @@ miles-data/
     ├── patterns.md                  ← accumulated patterns (Claude maintains)
     ├── chat-insights.md             ← named observations + open threads (Claude maintains)
     ├── people-profile.md            ← people YAML ledger (Claude maintains, created on first write)
-    ├── people-notes.md              ← richer per-person narratives (planned, created on first write)
-    └── evolution.md                 ← quarterly life phase entries (Claude maintains, created on first write)
+    ├── people-notes.md              ← richer per-person narratives (Claude maintains, created on first write)
+    ├── evolution.md                 ← quarterly life phase entries (Claude maintains, created on first write)
+    └── reflections.md               ← gratitude/wins/memory running log (Claude maintains, created on first write)
 ```
 
 ---

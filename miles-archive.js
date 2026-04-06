@@ -486,6 +486,8 @@ Section metadata format:
 UPDATE when: a correlation confirmed 3+ times across different days, a behavioral pattern confirmed 4+ times, an emotional pattern across 3+ session narratives, a win worth recording, an open thread opened or closed, a goal stagnant 4+ weeks or actively moving.
 DO NOT update: every session, for single incidents, for things already accurately captured.
 
+Entry ordering: within list-based sections (Journal Entry Wins, Completed Milestones, In Progress, Open Threads, Declined), newest entries first.
+
 When updating, also clean the doc: mark resolved patterns as resolved, remove Declined entries older than 4 weeks, flag health correlations that predate a recent state doc change as "needs review — health context changed [[date]]." If a pattern's last confirmed date is 8+ weeks ago and hasn't recurred, mark it "needs review — stale."
 
 Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
@@ -524,7 +526,7 @@ Narrative observation in paragraph form.
 Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the document.
 
 Rules:
-- Append new entries to the correct existing section; create a new ## Section if none fit
+- Prepend new entries at the top of the correct existing section (newest first); create a new ## Section if none fit
 - Preserve all prior entries verbatim
 - Add a line to ## Return Threads if the entry has a Watch or Return to note; remove if a prior thread was resolved this session
 - Return Thread links use [[#Section Name|label]] format — the section name must exactly match an existing ## header. Only add a Return Thread entry if you are also writing the corresponding section body in this same update, OR the section already exists in the current file. Do not create a Return Thread that points to a section you haven't written.
@@ -652,29 +654,22 @@ Skip if: routine numbers session, Miles is clearly exhausted or in brief mode, n
 
   // ── Section: Reflections log update instructions
   const reflectionsUpdate = `REFLECTIONS LOG UPDATES
-After producing the journal entry, always output the new reflection block for notes/reflections.md:
+After producing the journal entry, always output exactly three lines for notes/reflections.md — one per type:
 
 <<<REFLECTIONS_START>>>
-## [[${date}]]
-
-**Gratitude**
-- [[wikilinked person or theme]] #gratitude
-
-**Wins**
-- [[wikilinked win or goal zone]] #win
-
-**Memory**
-> One sentence. #memory
+- [[${date}]] — [[wikilinked person or theme]] #gratitude
+- [[${date}]] — [[wikilinked win or goal zone]] #win
+- [[${date}]] — One sentence. #memory
 <<<REFLECTIONS_END>>>
 
 Wikilink rules — wrap in [[double brackets]]:
 - Named people → [[First Name]] (match people-profile.md names)
 - Goal zones → [[Health]], [[Relationships]], [[Creative Work]], [[Finance]], etc.
 - Recurring themes → [[rest]], [[connection]], [[pain]], [[clarity]], [[small wins]], etc. — infer from context
-- Dates → [[YYYY-MM-DD]] format only
+- The date is already in the line prefix — do not repeat it inside the content
 
-The YAML frontmatter reflection: block uses plain text (no wikilinks). This block is the Obsidian-optimized version — wikilink everything meaningful.
-Multiple gratitude items and wins are fine (1–3 each). Memory is always exactly one sentence.
+The file has three top-level sections (## Gratitude, ## Wins, ## Memory). Each line goes into its matching section, newest at the top.
+Exactly one line per type per session — specificity over quantity.
 Always emit this block after every daily entry — it is not optional.`;
 
   // ── Section: Language + notability
@@ -1995,20 +1990,38 @@ function dismissReflections() {
   document.getElementById('reflections-st').className = '';
 }
 
+function insertAtSectionTop(doc, header, line) {
+  const marker = '\n' + header + '\n';
+  const idx = doc.indexOf(marker);
+  if (idx === -1) return doc;
+  const afterHeader = idx + marker.length;
+  // Skip blank lines to find where the list starts (or where to begin one)
+  let pos = afterHeader;
+  while (pos < doc.length && doc[pos] === '\n') pos++;
+  return doc.slice(0, pos) + line + '\n' + doc.slice(pos);
+}
+
 function mergeReflectionsUpdate(currentDoc, newEntry) {
   const date = S.sessionDate;
+  const lines = newEntry.split('\n').map(l => l.trim()).filter(Boolean);
+  const gratLine = lines.find(l => /#gratitude\b/.test(l)) || '';
+  const winLine  = lines.find(l => /#win\b/.test(l))       || '';
+  const memLine  = lines.find(l => /#memory\b/.test(l))    || '';
+
   if (!currentDoc) {
-    // First write — build the full file
-    return `---\ntags: [reflections]\n---\n\n# Reflections Log\n\n*Last updated: [[${date}]]*\n\n---\n\n${newEntry}\n`;
+    // First write — build the full file with three sections
+    return `---\ntags: [reflections]\n---\n\n# Reflections Log\n\n*Last updated: [[${date}]]*\n\n---\n\n## Gratitude\n\n${gratLine}\n\n---\n\n## Wins\n\n${winLine}\n\n---\n\n## Memory\n\n${memLine}\n`;
   }
+
   // Update last-updated date
   let doc = currentDoc.replace(/\*Last updated: \[\[\d{4}-\d{2}-\d{2}\]\]\*/, `*Last updated: [[${date}]]*`);
-  // Insert new entry after the first --- separator that follows the header
-  const luIdx = doc.indexOf('*Last updated:');
-  const hrIdx = doc.indexOf('\n---', luIdx !== -1 ? luIdx : 0);
-  if (hrIdx === -1) return doc.trimEnd() + '\n\n---\n\n' + newEntry + '\n';
-  const insertAt = hrIdx + '\n---'.length;
-  return doc.slice(0, insertAt) + '\n\n' + newEntry + '\n\n---' + doc.slice(insertAt);
+
+  // Prepend each line at the top of its section (newest first)
+  if (gratLine) doc = insertAtSectionTop(doc, '## Gratitude', gratLine);
+  if (winLine)  doc = insertAtSectionTop(doc, '## Wins',      winLine);
+  if (memLine)  doc = insertAtSectionTop(doc, '## Memory',    memLine);
+
+  return doc;
 }
 
 async function saveReflections() {
