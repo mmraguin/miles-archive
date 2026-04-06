@@ -1111,7 +1111,13 @@ function setStat(state, txt) {
   document.getElementById('stat-txt').textContent = txt;
 }
 
+function hideEmptyState() {
+  const el = document.getElementById('chat-empty');
+  if (el) el.remove();
+}
+
 function addSys(txt) {
+  hideEmptyState();
   const c = document.getElementById('chat');
   const w = document.createElement('div'); w.className = 'msg sys';
   const b = document.createElement('div'); b.className = 'bub'; b.textContent = txt;
@@ -1120,9 +1126,24 @@ function addSys(txt) {
 }
 
 function addMsg(role, txt) {
+  hideEmptyState();
   const c = document.getElementById('chat');
   const w = document.createElement('div'); w.className = `msg ${role}`;
-  const b = document.createElement('div'); b.className = 'bub'; b.textContent = txt;
+  const b = document.createElement('div'); b.className = 'bub';
+  if (role === 'assistant') {
+    const m = txt.match(/^(.{20,180}?[.!?])\s+([\s\S]+)$/);
+    if (m) {
+      const lede = document.createElement('span');
+      lede.className = 'lede';
+      lede.textContent = m[1];
+      b.appendChild(lede);
+      b.appendChild(document.createTextNode(m[2]));
+    } else {
+      b.textContent = txt;
+    }
+  } else {
+    b.textContent = txt;
+  }
   w.appendChild(b); c.appendChild(w);
   c.scrollTop = c.scrollHeight;
   return b;
@@ -2047,7 +2068,7 @@ function _clearAndStart() {
   document.getElementById('review-btn').classList.remove('on');
   document.getElementById('review-bar').classList.remove('show');
   document.getElementById('review-st').className = '';
-  document.getElementById('chat').innerHTML = '';
+  document.getElementById('chat').innerHTML = '<div id="chat-empty"><span id="chat-empty-day"></span></div>';
   document.getElementById('save-bar').classList.remove('show');
   document.getElementById('save-st').className = '';
   document.getElementById('save-go').disabled = false;
@@ -2070,6 +2091,8 @@ function _initSessionMeta() {
   S.sessionDow = dowManila(sessionDt);
   S.sessionDay = dayIndexManila(sessionDt);
   document.getElementById('wm-date').textContent = S.sessionDate;
+  const emptyDay = document.getElementById('chat-empty-day');
+  if (emptyDay) emptyDay.textContent = S.sessionDow;
 }
 
 // ── Generic GitHub file fetcher (silent) ─────────────────────────────────────
