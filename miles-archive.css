@@ -6,9 +6,9 @@
   --surface-hi:  #171717;
   --line:        #1e1e1e;
   --line-hi:     #282828;
-  --text:        #f0ece6;
-  --text-2:      #999390;
-  --text-3:      #575250;
+  --text:        #e9e9e9;
+  --text-2:      #8a8a8a;
+  --text-3:      #505050;
   --teal:        #4ecdb4;
   --teal-soft:   rgba(78,205,180,0.13);
   --rose:        #fb7185;
@@ -18,7 +18,7 @@
   --success:     #4ecdb4;
   --error:       #e07070;
   --warn:        #d4a96a;
-  --r-msg:       20px;
+  --r-msg:       3px;
 }
 
 * {
@@ -68,10 +68,10 @@ html, body {
 
 #wm-main {
   font-family: 'Fraunces', serif;
-  font-style: italic;
+  font-style: normal;
   font-weight: 300;
-  font-size: 28px;
-  letter-spacing: -0.02em;
+  font-size: 26px;
+  letter-spacing: 0.04em;
   color: var(--text);
   line-height: 1;
 }
@@ -101,7 +101,7 @@ html, body {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 6px 11px;
-  border-radius: 30px;
+  border-radius: 0;
   transition: color 0.18s, background 0.18s, border-color 0.18s;
   white-space: nowrap;
   line-height: 1;
@@ -193,7 +193,7 @@ html, body {
   color: var(--text-3); text-align: center;
   padding: 4px 12px;
   border: 1px solid var(--line-hi);
-  border-radius: 30px;
+  border-radius: 0;
   background: var(--surface);
 }
 
@@ -229,7 +229,7 @@ html, body {
 #pat-go {
   background: none; border: 1px solid var(--teal); cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  color: var(--teal); padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #pat-go:hover    { opacity: 0.82; }
@@ -268,7 +268,7 @@ html, body {
 #goals-summary-go {
   background: none; border: 1px solid var(--teal); cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  color: var(--teal); padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #goals-summary-go:hover    { opacity: 0.82; }
@@ -307,7 +307,7 @@ html, body {
 #insights-go {
   background: none; border: 1px solid #a78bfa; cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: #a78bfa; padding: 9px 22px; border-radius: 30px;
+  color: #a78bfa; padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #insights-go:hover    { opacity: 0.82; }
@@ -346,7 +346,7 @@ html, body {
 #state-go {
   background: none; border: 1px solid var(--teal); cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  color: var(--teal); padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #state-go:hover    { opacity: 0.82; }
@@ -385,7 +385,7 @@ html, body {
 #save-go {
   background: var(--teal); border: none; cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: #080808; padding: 9px 22px; border-radius: 30px;
+  color: #080808; padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #save-go:hover    { opacity: 0.82; }
@@ -450,7 +450,7 @@ html, body {
   gap: 8px;
   background: var(--surface);
   border: 1px solid var(--line-hi);
-  border-radius: 26px;
+  border-radius: 2px;
   padding: 8px 8px 8px 16px;
   transition: border-color 0.2s;
   cursor: text;
@@ -470,11 +470,11 @@ html, body {
   -webkit-appearance: none;
   display: block; width: 100%;
 }
-#inp::placeholder { color: var(--text-3); font-style: italic; }
+#inp::placeholder { color: var(--text-3); font-style: normal; }
 
 #send-btn {
   background: var(--teal); border: none; cursor: pointer;
-  width: 34px; height: 34px; border-radius: 50%;
+  width: 34px; height: 34px; border-radius: 2px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   transition: opacity 0.18s, transform 0.12s;
@@ -498,24 +498,24 @@ html, body {
   background: var(--surface);
   width: 100%; max-width: 680px;
   border-top: 1px solid var(--line-hi);
-  border-radius: 20px 20px 0 0;
+  border-radius: 0;
   padding: 28px 24px max(36px, env(safe-area-inset-bottom));
   max-height: 80dvh; overflow-y: auto;
   display: flex; flex-direction: column; gap: 24px;
 }
 
 .sh-handle {
-  width: 36px; height: 4px;
+  width: 36px; height: 1px;
   background: var(--line-hi);
-  border-radius: 2px;
+  border-radius: 0;
   margin: 0 auto 4px;
   flex-shrink: 0;
 }
 
 .sh-title {
-  font-family: 'Fraunces', serif; font-style: italic;
+  font-family: 'Fraunces', serif; font-style: normal;
   font-size: 22px; font-weight: 300;
-  color: var(--text); letter-spacing: -0.01em;
+  color: var(--text); letter-spacing: 0.02em;
 }
 
 .sh-field  { display: flex; flex-direction: column; gap: 8px; }
@@ -525,7 +525,7 @@ html, body {
 .bare {
   background: var(--surface-hi);
   border: 1px solid var(--line-hi);
-  border-radius: 10px;
+  border-radius: 0;
   color: var(--text);
   font-family: 'DM Mono', monospace;
   font-size: 16px; /* 16px prevents iOS zoom on focus */
@@ -541,7 +541,7 @@ html, body {
 .sh-cta {
   background: var(--teal); border: none; cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: #080808; padding: 9px 22px; border-radius: 30px;
+  color: #080808; padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 .sh-cta:hover { opacity: 0.82; }
@@ -566,7 +566,7 @@ html, body {
   font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 300;
   line-height: 1.7; color: var(--text-2); white-space: pre-wrap;
   background: var(--bg); border: 1px solid var(--line);
-  padding: 14px; border-radius: 10px;
+  padding: 14px; border-radius: 0;
   max-height: 220px; overflow-y: auto; display: none;
 }
 #fetched-pre.show { display: block; }
@@ -602,7 +602,7 @@ html, body {
 #people-go {
   background: none; border: 1px solid var(--teal); cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  color: var(--teal); padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #people-go:hover { opacity: 0.82; }
@@ -635,7 +635,7 @@ html, body {
 #people-notes-go {
   background: none; border: 1px solid var(--rose); cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: var(--rose); padding: 9px 22px; border-radius: 30px;
+  color: var(--rose); padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #people-notes-go:hover { opacity: 0.82; }
@@ -668,7 +668,7 @@ html, body {
 #reflections-go {
   background: none; border: 1px solid var(--teal); cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  color: var(--teal); padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #reflections-go:hover { opacity: 0.82; }
@@ -701,7 +701,7 @@ html, body {
 #evo-go {
   background: none; border: 1px solid var(--teal); cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  color: var(--teal); padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #evo-go:hover { opacity: 0.82; }
@@ -736,7 +736,7 @@ html, body {
 #review-go {
   background: none; border: 1px solid #f59e0b; cursor: pointer;
   font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  color: #f59e0b; padding: 9px 22px; border-radius: 30px;
+  color: #f59e0b; padding: 9px 22px; border-radius: 0;
   transition: opacity 0.18s; line-height: 1;
 }
 #review-go:hover    { opacity: 0.82; }
@@ -815,9 +815,9 @@ html, body {
 }
 
 .dash-headline {
-  font-family: 'Fraunces', serif; font-style: italic; font-weight: 300;
+  font-family: 'Fraunces', serif; font-style: normal; font-weight: 300;
   font-size: clamp(22px, 5vw, 32px); line-height: 1.25;
-  color: var(--text); letter-spacing: -0.02em;
+  color: var(--text); letter-spacing: 0.02em;
   padding: 6px 0 0;
 }
 
@@ -837,7 +837,7 @@ html, body {
   font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 300;
   letter-spacing: 0.08em; color: var(--teal);
   background: var(--teal-soft); border: 1px solid rgba(78,205,180,0.25);
-  padding: 4px 12px; border-radius: 30px;
+  padding: 4px 12px; border-radius: 0;
 }
 
 /* Score bars */
@@ -857,8 +857,8 @@ html, body {
   letter-spacing: 0.06em; color: var(--text-2);
   width: 68px; flex-shrink: 0; text-transform: uppercase;
 }
-.metric-bar-wrap { flex: 1; height: 3px; background: var(--line-hi); border-radius: 2px; }
-.metric-bar { height: 3px; border-radius: 2px; background: var(--teal); transition: width 0.6s ease; }
+.metric-bar-wrap { flex: 1; height: 2px; background: var(--line-hi); border-radius: 0; }
+.metric-bar { height: 2px; border-radius: 0; background: var(--teal); transition: width 0.6s ease; }
 .metric-bar.low  { background: var(--error); }
 .metric-bar.mid  { background: var(--warn); }
 .metric-score {
@@ -884,7 +884,7 @@ html, body {
 }
 .almanac-cell {
   width: 100%; aspect-ratio: 1;
-  border-radius: 6px; border: 1px solid var(--line-hi);
+  border-radius: 0; border: 1px solid var(--line-hi);
 }
 .almanac-val {
   font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
@@ -914,7 +914,7 @@ html, body {
   padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--line-hi);
-  border-radius: 12px;
+  border-radius: 0;
   margin-bottom: 10px;
 }
 .obs-label {
@@ -950,7 +950,7 @@ html, body {
 }
 .person-row:last-child { border-bottom: none; }
 .person-avatar {
-  width: 34px; height: 34px; border-radius: 50%;
+  width: 34px; height: 34px; border-radius: 0;
   background: var(--surface-hi); border: 1px solid var(--line-hi);
   display: flex; align-items: center; justify-content: center;
   font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 400;
@@ -969,7 +969,7 @@ html, body {
 .person-theme {
   font-family: 'DM Mono', monospace; font-size: 8px; font-weight: 300;
   color: var(--text-3); background: var(--surface-hi);
-  border: 1px solid var(--line-hi); padding: 2px 7px; border-radius: 30px;
+  border: 1px solid var(--line-hi); padding: 2px 7px; border-radius: 0;
   letter-spacing: 0.06em;
 }
 .person-meta { text-align: right; flex-shrink: 0; }
@@ -994,8 +994,8 @@ html, body {
   color: var(--text-3); letter-spacing: 0.08em; margin-bottom: 6px;
 }
 .evo-phase {
-  font-family: 'Fraunces', serif; font-style: italic; font-weight: 300;
-  font-size: 20px; color: var(--text); letter-spacing: -0.01em; margin-bottom: 12px;
+  font-family: 'Fraunces', serif; font-style: normal; font-weight: 300;
+  font-size: 20px; color: var(--text); letter-spacing: 0.02em; margin-bottom: 12px;
 }
 .evo-body {
   font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 300;
@@ -1010,6 +1010,6 @@ html, body {
 .dash-sparse-note {
   font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
   color: var(--text-3); letter-spacing: 0.06em; margin-top: 8px;
-  padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: 0;
   display: inline-block;
 }
