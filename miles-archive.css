@@ -56,29 +56,30 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 52px 20px 12px;
+  padding: 44px 20px 8px;
   flex-shrink: 0;
 }
 
 #wordmark {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 10px;
 }
 
 #wm-main {
   font-family: 'Fraunces', serif;
   font-style: normal;
   font-weight: 300;
-  font-size: 26px;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  letter-spacing: -0.01em;
   color: var(--text);
   line-height: 1;
 }
 
 #wm-date {
   font-family: 'DM Mono', monospace;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 300;
   color: var(--text-3);
   letter-spacing: 0.06em;
@@ -87,27 +88,27 @@ html, body {
 #nav {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
 }
 
 .nav-btn {
-  background: var(--surface);
-  border: 1px solid var(--line-hi);
-  color: var(--text-2);
+  background: none;
+  border: none;
+  color: var(--text-3);
   cursor: pointer;
   font-family: 'DM Mono', monospace;
   font-size: 9px;
   font-weight: 300;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  padding: 6px 11px;
+  padding: 4px 6px;
   border-radius: 0;
-  transition: color 0.18s, background 0.18s, border-color 0.18s;
+  transition: color 0.18s;
   white-space: nowrap;
   line-height: 1;
 }
-.nav-btn:hover { color: var(--text); background: var(--surface-hi); }
-.nav-btn.on    { color: var(--teal); border-color: var(--teal); background: var(--teal-soft); }
+.nav-btn:hover { color: var(--text-2); background: none; }
+.nav-btn.on    { color: var(--teal); background: none; border: none; }
 
 /* ── Status ── */
 #status {
@@ -173,13 +174,13 @@ html, body {
   padding: 11px 16px;
   border-radius: var(--r-msg) var(--r-msg) 5px var(--r-msg);
   color: var(--text);
-  font-size: 14.5px;
+  font-size: 13.5px;
   line-height: 1.65;
 }
 
 .msg.assistant .bub {
   color: var(--text);
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 300;
   line-height: 1.82;
   max-width: 96%;
@@ -473,16 +474,17 @@ html, body {
 #inp::placeholder { color: var(--text-3); font-style: normal; }
 
 #send-btn {
-  background: var(--teal); border: none; cursor: pointer;
-  width: 34px; height: 34px; border-radius: 2px;
+  background: none; border: none; cursor: pointer;
+  width: 34px; height: 34px; border-radius: 0;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  transition: opacity 0.18s, transform 0.12s;
+  color: var(--teal);
+  transition: opacity 0.18s;
   padding: 0;
 }
-#send-btn:hover    { opacity: 0.85; transform: scale(1.05); }
-#send-btn:disabled { opacity: 0.18; cursor: not-allowed; transform: none; }
-#send-btn svg      { width: 14px; height: 14px; }
+#send-btn:hover    { opacity: 0.6; }
+#send-btn:disabled { opacity: 0.18; cursor: not-allowed; }
+#send-btn svg      { width: 16px; height: 16px; fill: none; stroke: var(--teal); stroke-width: 1.5; }
 
 /* ── Overlays ── */
 .ov {
@@ -515,7 +517,7 @@ html, body {
 .sh-title {
   font-family: 'Fraunces', serif; font-style: normal;
   font-size: 22px; font-weight: 300;
-  color: var(--text); letter-spacing: 0.02em;
+  color: var(--text); letter-spacing: -0.05em;
 }
 
 .sh-field  { display: flex; flex-direction: column; gap: 8px; }
@@ -757,7 +759,7 @@ html, body {
 #review-st.err  { color: var(--error); }
 #review-st.info { color: var(--text-2); }
 
-#review-btn.on { color: #f59e0b; border-color: #f59e0b; background: rgba(245,158,11,0.08); }
+#review-btn.on { color: #f59e0b; border: none; background: none; }
 
 /* ── Dashboard ── */
 #dash-app {
@@ -773,7 +775,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 52px 20px 12px;
+  padding: 44px 20px 8px;
   flex-shrink: 0;
 }
 
@@ -817,13 +819,13 @@ html, body {
 .dash-headline {
   font-family: 'Fraunces', serif; font-style: normal; font-weight: 300;
   font-size: clamp(22px, 5vw, 32px); line-height: 1.25;
-  color: var(--text); letter-spacing: 0.02em;
+  color: var(--text); letter-spacing: -0.05em;
   padding: 6px 0 0;
 }
 
 /* Radars */
 .dash-radars {
-  display: flex; gap: 20px; flex-wrap: wrap;
+  display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
 }
 .radar-wrap {
   flex: 1; min-width: 180px; max-width: 260px;
@@ -995,7 +997,7 @@ html, body {
 }
 .evo-phase {
   font-family: 'Fraunces', serif; font-style: normal; font-weight: 300;
-  font-size: 20px; color: var(--text); letter-spacing: 0.02em; margin-bottom: 12px;
+  font-size: 20px; color: var(--text); letter-spacing: -0.05em; margin-bottom: 12px;
 }
 .evo-body {
   font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 300;

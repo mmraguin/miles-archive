@@ -2736,12 +2736,12 @@ function makePentagonSvg(values, labels) {
     const x = cx + d * Math.cos(angles[i]);
     const y = cy + d * Math.sin(angles[i]);
     const anchor = Math.cos(angles[i]) > 0.15 ? 'start' : Math.cos(angles[i]) < -0.15 ? 'end' : 'middle';
-    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="#575250" font-family="DM Mono,monospace" font-size="8" letter-spacing="1">${lbl.toUpperCase()}</text>`;
+    return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="${anchor}" dominant-baseline="middle" fill="#505050" font-family="DM Mono,monospace" font-size="8" letter-spacing="1">${lbl.toUpperCase()}</text>`;
   }).join('');
 
   const valid = values.filter(v => v != null && v > 0);
   const avg = valid.length ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(1) : '—';
-  const centerEl = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="#f0ece6" font-family="Fraunces,serif" font-size="20" font-style="italic">${avg}</text>`;
+  const centerEl = `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="#e9e9e9" font-family="Fraunces,serif" font-size="20" font-style="normal">${avg}</text>`;
 
   return `<svg viewBox="0 0 220 220" width="100%" style="max-width:220px;display:block">${gridLines}${axisLines}${dataPolygon}${labelEls}${centerEl}</svg>`;
 }
