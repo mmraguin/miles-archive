@@ -1147,10 +1147,14 @@ function hk(e) {
 }
 
 // Focus textarea when tapping anywhere in input container
+// Blur (dismiss keyboard) when tapping the chat area
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('input-inner')?.addEventListener('click', () => {
     document.getElementById('inp').focus();
   });
+  document.getElementById('chat')?.addEventListener('touchstart', () => {
+    document.getElementById('inp').blur();
+  }, { passive: true });
 });
 
 // ── Inline confirm (replaces native confirm()) ────────────────────────────────

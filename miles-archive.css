@@ -174,13 +174,13 @@ html, body {
   padding: 11px 16px;
   border-radius: var(--r-msg) var(--r-msg) 5px var(--r-msg);
   color: var(--text);
-  font-size: 13.5px;
+  font-size: 12px;
   line-height: 1.65;
 }
 
 .msg.assistant .bub {
   color: var(--text);
-  font-size: 13.5px;
+  font-size: 12px;
   font-weight: 300;
   line-height: 1.82;
   max-width: 96%;
