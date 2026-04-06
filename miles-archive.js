@@ -29,6 +29,9 @@ const S = {
   deepFetched:        false, // whether deep context fetch has fired this session
   _queuedPatterns:    null,  // patterns update queued to show after entry bar clears
   _queuedGoalsSummary: null, // goals summary queued to show after patterns bar clears
+  chatInsights:       null,  // fetched from notes/chat-insights.md
+  pendingInsights:    null,  // insights update pending save
+  _queuedInsights:    null,  // insights queued to show after goals-summary bar clears
   peopleProfile:      null,  // fetched from notes/people-profile.md
   pendingPeople:      null,  // people profile update pending save
   peopleNotes:        null,  // fetched from notes/people-notes.md
@@ -425,7 +428,7 @@ EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "tak
 
 ---
 
-## Open Threads
+## Return Threads
 
 - [short label](#section-name) — one-line description
 
@@ -444,7 +447,9 @@ Narrative observation in paragraph form.
 Rules:
 - Append new entries to the correct existing section; create a new ## Section if none fit
 - Preserve all prior entries verbatim
-- Add a line to ## Open Threads if the entry has a Watch or Return to note; remove if a prior thread was resolved this session
+- Add a line to ## Return Threads if the entry has a Watch or Return to note; remove if a prior thread was resolved this session
+- Return Thread anchors must exactly match an existing ## Section header in this file (spaces → hyphens, lowercase). Only add a Return Thread entry if you are also writing the corresponding section body in this same update, OR the section already exists in the current file. Do not create a Return Thread that points to a section you haven't written.
+- When a Watch note has resolved (the thing being watched has happened), update that entry to note the outcome rather than leaving the original Watch line unchanged.
 - UPDATE when: a named experience surfaces, a realization or shift is articulated, Miles signals something is worth keeping
 - DO NOT update: every session, for passing comments, for things already captured`;
 
@@ -521,11 +526,11 @@ Rules:
   const goalsSummaryUpdate = S.brief ? '' : `GOALS SUMMARY UPDATES
 Update notes/goals-summary.md conservatively — this is a correction, not a routine update.
 
-Trigger only if both of these are true:
-1. The current summary was last updated more than 14 days ago.
-2. At least one of: a listed goal has shown no movement for 8+ weeks; or a new focus has emerged consistently across 4+ weeks of entries that isn't reflected in the current summary.
+Trigger only if EITHER of these is true:
+1. The current summary was last updated more than 14 days ago AND at least one of: a listed goal has shown no movement for 8+ weeks; or a new focus has emerged consistently across 4+ weeks of entries that isn't reflected in the current summary.
+2. A goal in the summary is framed as active but confirmed patterns show the underlying context is absent or directly contradicted — e.g., a relationship goal with no relationship context in 6+ months, or a behavioral goal that patterns.md marks as stalled. Update the line to reflect actual state rather than aspirational target. This pathway is not gated by the 14-day minimum.
 
-Never trigger: if the summary was updated in the last 14 days; if today's session is routine; if nothing in today's session or recent patterns contradicts what's already in the summary.
+Never trigger: if the summary was updated in the last 14 days and no contradiction exists; if today's session is routine; if nothing in today's session or recent patterns contradicts what's already in the summary.
 
 When triggering, output the complete updated file wrapped in markers:
 
@@ -542,7 +547,7 @@ When triggering, output the complete updated file wrapped in markers:
 - [Life zone]: [specific outcome or milestone actively in progress]
 <<<GOALS_SUMMARY_END>>>
 
-Format: 4–5 lines. Each line is one active focus — specific enough to recognize when a journal entry connects or contradicts. Not a values statement. What's actually in motion right now.`;
+Format: 4–5 lines. Each line is one active focus — specific enough to recognize when a journal entry connects or contradicts. Not a values statement. What's actually in motion right now. You may append a trajectory marker — use only: (→ active), (→ stalled), (→ Q2 focus), (→ blocked) — only when the current state clearly differs from the target and omitting it would mislead. Do not invent other marker values.`;
 
   // ── Section: Evolution update (only injected when triggered)
   const evolutionUpdate = S.evoTrigger ? `EVOLUTION ENTRY
@@ -639,12 +644,13 @@ function mergePatternsUpdate(currentDoc, updateDoc) {
     : currentDoc;
 
   // Extract each ## Section block from the update and splice into current doc
-  const sectionRe = /^(## .+)$([\s\S]*?)(?=^## |\s*$)/gm;
-  let match;
-  while ((match = sectionRe.exec(updateDoc)) !== null) {
-    const header = match[1].trim();
-    const newContent = match[0].trimEnd();
-    const secRe = new RegExp(`(^${escRe(header)}$[\\s\\S]*?)(?=^## |\\s*$)`, 'm');
+  const chunks = updateDoc.split(/^(?=## )/m);
+  for (const chunk of chunks) {
+    if (!chunk.startsWith('## ')) continue;
+    const header = chunk.match(/^## .+/)[0].trim();
+    const newContent = chunk.trimEnd();
+    // Match header + all following lines that don't start a new ## section
+    const secRe = new RegExp(`^${escRe(header)}(\\n(?!## ).*)*`, 'm');
     if (secRe.test(result)) {
       result = result.replace(secRe, newContent + '\n\n');
     } else {
@@ -665,8 +671,8 @@ async function triggerPostEntryReview() {
   const sessionDate = S.sessionDate;
   S._reviewRunning = true;
 
-  const sessionSummary = S.messages.slice(-12)
-    .map(m => `[${m.role.toUpperCase()}]: ${m.content.slice(0, 500)}`)
+  const sessionSummary = S.messages.slice(-20)
+    .map(m => `[${m.role.toUpperCase()}]: ${m.content.slice(0, 800)}`)
     .join('\n\n');
 
   const reviewMessages = [{
@@ -697,7 +703,7 @@ async function triggerPostEntryReview() {
 }
 
 // ── Review mode system prompt ─────────────────────────────────────────────────
-function buildReviewPrompt(incompleteBlock) {
+function buildReviewPrompt(incompleteBlock, goalsCurrent) {
   const { sessionDate: date, sessionDow: dow } = S;
 
   const identity = `You are Miles's life coach running a quarterly review. You've read her journal, patterns, and goals. You have a formed point of view. Lead with what you see — push on what's stalled, celebrate what moved, challenge goals that need reconsideration. Coaching-forward. Not therapeutic, not an intake interview.`;
@@ -712,6 +718,10 @@ function buildReviewPrompt(incompleteBlock) {
 
   const goalsSummary = S.goals
     ? `GOALS SUMMARY\n${S.goals}`
+    : '';
+
+  const goalsDoc = goalsCurrent
+    ? `FULL GOALS (goals/current.md)\n${goalsCurrent}`
     : '';
 
   const patterns = S.patterns
@@ -730,18 +740,16 @@ function buildReviewPrompt(incompleteBlock) {
     ? `EVOLUTION\n${S.evolution}`
     : '';
 
-  const recentContext = S.recentEntries.length
-    ? 'RECENT ENTRIES (compressed)\n' + S.recentEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n')
-    : '';
-
   const incompleteCtx = incompleteBlock
     ? `INCOMPLETE REVIEW (continue from here)\nA previous review was started but not finished. Continue it — pick up where it left off, complete the remaining sections, and output the full merged version in the markers. It will overwrite the incomplete entry.\n\nPrevious content:\n${incompleteBlock}`
     : '';
 
-  const reviewInstructions = `REVIEW SESSION FLOW
+  const reviewInstructions = `PRIMARY SOURCES: Patterns and chat insights are your primary data for this review — they represent distilled intelligence across all sessions. Cross-reference against the goals summary and full goals doc to assess alignment, stalls, and drift. State of Miles provides current clinical context. Do not analyze individual entry health metrics; that signal is already absorbed into patterns.
+
+REVIEW SESSION FLOW
 
 Phase 1 — Opening (first reply only):
-Lead with 2–3 specific observations from the data — what moved, what stalled, what pattern keeps showing up. Don't ask for more data, don't recap. Ask ONE targeted question based on what you observed. Close with: "Say 'write it up' when you're ready for the written review."
+Lead with 2–3 specific observations from patterns and chat insights — what moved, what stalled, what thread keeps showing up. Don't ask for more data, don't recap. Ask ONE targeted question based on what you observed. Close with: "Say 'write it up' when you're ready for the written review."
 
 Phase 2 — Coaching:
 Push back on stalled goals. Celebrate wins by name. Challenge goals that no longer fit. Surface new possibilities if patterns suggest them. After 2–3 turns, if you have enough: "I have what I need — want me to write this up?"
@@ -776,7 +784,11 @@ OUTPUT FORMAT (wrap in markers when triggered):
 For check-in: use Type: check-in, keep sections brief.`;
 
   const goalsSummaryUpdate = `GOALS SUMMARY UPDATES
-At the end of every review session, output an updated goals summary — this is the natural capstone of a review. Always fire this.
+At the end of every review session, output an updated notes/goals-summary.md. Always fire this — it's the mechanism by which review action items reach daily sessions.
+
+Replace the goals lines with quarter-specific active focuses based on the action items surfaced in this review — one line per life zone, specific enough to recognize in a daily entry. Append a trajectory marker to each: (→ active), (→ stalled), (→ Q2 focus), (→ blocked). Use only these four marker values. Do not carry forward annual aspirational targets that are either already met or have no active plan this quarter.
+
+Also output a ## Review Log Summary section with: wins, stalls, central pattern, and next-quarter focus — pulled from this review.
 
 <<<GOALS_SUMMARY_START>>>
 # Active Goals Summary
@@ -784,11 +796,20 @@ At the end of every review session, output an updated goals summary — this is 
 *Last updated: ${date}*
 *Full goals: goals/current.md*
 
-- [Life zone]: [specific outcome or milestone actively in progress]
-- [Life zone]: [specific outcome or milestone actively in progress]
-- [Life zone]: [specific outcome or milestone actively in progress]
-- [Life zone]: [specific outcome or milestone actively in progress]
-- [Life zone]: [specific outcome or milestone actively in progress]
+- [zone]: [quarter-specific action] (→ [state])
+- [zone]: [quarter-specific action] (→ [state])
+- [zone]: [quarter-specific action] (→ [state])
+- [zone]: [quarter-specific action] (→ [state])
+- [zone]: [quarter-specific action] (→ [state])
+
+## Review Log Summary
+
+*Last reviewed: [quarter] · Full log: goals/review-log.md*
+
+**[Quarter] wins:** ...
+**[Quarter] stalls:** ...
+**Central pattern:** ...
+**[Next quarter] focus:** ...
 <<<GOALS_SUMMARY_END>>>`;
 
   const peopleNotesUpdate = `PEOPLE NOTES UPDATES
@@ -836,7 +857,7 @@ ${daysSinceEvo === null ? 'No evolution entries exist yet.' : `Last evolution en
 After the review wraps, if the session surfaced a genuine phase shift or it's been a long time, mention in one sentence that it might be worth capturing as an evolution entry. Example: "This might be worth logging as a phase moment — want to do an evolution entry?" Don't produce the entry — just suggest it, once, naturally. Keep modes distinct.`
     : '';
 
-  return [identity, context, sessionType, stateDoc, goalsSummary, patterns, chatInsights, peopleNotes, evolution, recentContext, incompleteCtx, reviewInstructions, goalsSummaryUpdate, peopleNotesUpdate, peopleUpdate, evolutionSuggestion]
+  return [identity, context, sessionType, stateDoc, goalsSummary, goalsDoc, patterns, chatInsights, peopleNotes, evolution, incompleteCtx, reviewInstructions, goalsSummaryUpdate, peopleNotesUpdate, peopleUpdate, evolutionSuggestion]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -855,7 +876,7 @@ async function initReviewMode() {
   document.getElementById('chat').innerHTML = '';
   showDots();
 
-  const reviewLog = await fetchReviewLog();
+  const [reviewLog, goalsCurrent] = await Promise.all([fetchReviewLog(), fetchGoalsCurrent()]);
   S.reviewLog    = reviewLog;
   S.existingReview = reviewLog;
 
@@ -866,7 +887,7 @@ async function initReviewMode() {
     incompleteBlock = lastIdx === -1 ? reviewLog : reviewLog.slice(lastIdx + 1);
   }
 
-  const sysPrompt = buildReviewPrompt(incompleteBlock);
+  const sysPrompt = buildReviewPrompt(incompleteBlock, goalsCurrent);
 
   try {
     const openingContent = incomplete
@@ -1195,9 +1216,17 @@ async function saveEntry() {
       document.getElementById('save-bar').classList.remove('show');
       document.getElementById('save-st').className = '';
       if (S._queuedPatterns) {
-        const p = S._queuedPatterns;
-        S._queuedPatterns = null;
-        showPatBar(p);
+        const p = S._queuedPatterns; S._queuedPatterns = null; showPatBar(p);
+      } else if (S._queuedGoalsSummary) {
+        const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
+      } else if (S._queuedInsights) {
+        const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
+      } else if (S._queuedPeople) {
+        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+      } else if (S._queuedPeopleNotes) {
+        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+      } else if (S._queuedEvolution) {
+        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
       }
     }, 2400);
   } catch(err) {
@@ -1211,9 +1240,17 @@ function dismissSave() {
   document.getElementById('save-bar').classList.remove('show');
   document.getElementById('save-st').className = '';
   if (S._queuedPatterns) {
-    const p = S._queuedPatterns;
-    S._queuedPatterns = null;
-    showPatBar(p);
+    const p = S._queuedPatterns; S._queuedPatterns = null; showPatBar(p);
+  } else if (S._queuedGoalsSummary) {
+    const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
+  } else if (S._queuedInsights) {
+    const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
+  } else if (S._queuedPeople) {
+    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
+  } else if (S._queuedPeopleNotes) {
+    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+  } else if (S._queuedEvolution) {
+    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
   }
 }
 
@@ -1668,10 +1705,10 @@ function dismissReview() {
   document.getElementById('review-st').className = '';
   if (S._queuedGoalsSummary) {
     const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-  } else if (S._queuedPeople) {
-    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
   } else if (S._queuedPeopleNotes) {
     const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+  } else if (S._queuedPeople) {
+    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
   }
 }
 
@@ -1717,10 +1754,10 @@ async function saveReview() {
       document.getElementById('review-st').className = '';
       if (S._queuedGoalsSummary) {
         const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-      } else if (S._queuedPeople) {
-        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
       } else if (S._queuedPeopleNotes) {
         const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
+      } else if (S._queuedPeople) {
+        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
       }
     }, 2400);
   } catch(err) {
@@ -2043,6 +2080,7 @@ function fetchPeopleProfile() { return fetchEntry('notes/people-profile.md'); }
 function fetchPeopleNotes()   { return fetchEntry('notes/people-notes.md'); }
 function fetchEvolution()     { return fetchEntry('notes/evolution.md'); }
 function fetchReviewLog()     { return fetchEntry('goals/review-log.md'); }
+function fetchGoalsCurrent()  { return fetchEntry('goals/current.md'); }
 
 function parseEvolutionDate(content) {
   if (!content) return null;
@@ -2295,8 +2333,10 @@ function restoreDraft(draft) {
     if (m.role === 'user') {
       addMsg('user', m.content);
     } else if (m.role === 'assistant') {
-      const disp = m.content.includes('<<<ENTRY_START>>>')
-        ? (m.content.slice(0, m.content.indexOf('<<<ENTRY_START>>>')).trim() || 'Entry was ready.')
+      const markerRe = /<<<(ENTRY_START|REVIEW_START|PATTERNS_START|CHAT_INSIGHTS_START|GOALS_SUMMARY_START|PEOPLE_START|PEOPLE_NOTES_START|EVOLUTION_START)>>>/;
+      const markerIdx = m.content.search(markerRe);
+      const disp = markerIdx !== -1
+        ? (m.content.slice(0, markerIdx).trim() || 'Content was ready.')
         : m.content;
       addMsg('assistant', disp);
     }
@@ -2430,6 +2470,14 @@ function dashRefresh() {
 
 // ── Dashboard: data fetching ──────────────────────────────────────────────────
 
+function extractNarrativeExcerpt(content) {
+  const m = content.match(/## Narrative\n+([\s\S]+?)(?=\n## |\n---$|$)/);
+  if (!m) return null;
+  const text = m[1].trim();
+  const end = text.search(/[.!?](\s|$)/);
+  return end > 0 ? text.slice(0, end + 1) : text.slice(0, 150);
+}
+
 async function fetchDashEntries(days) {
   const today = todayManila();
   const dates = Array.from({ length: days }, (_, i) => daysAgo(today, i + 1));
@@ -2438,10 +2486,11 @@ async function fetchDashEntries(days) {
       fetchEntry(`journal/daily/${date.slice(0,4)}/${date}.md`)
         .then(content => {
           if (!content) return null;
-          const scores   = parseGraymatter(content);
-          const booleans = parseDashBooleans(content);
-          const dow      = new Date(date + 'T00:00:00Z').getUTCDay();
-          return scores ? { date, scores, booleans, dow } : null;
+          const scores    = parseGraymatter(content);
+          const booleans  = parseDashBooleans(content);
+          const narrative = extractNarrativeExcerpt(content);
+          const dow       = new Date(date + 'T00:00:00Z').getUTCDay();
+          return scores ? { date, scores, booleans, dow, narrative } : null;
         })
     )
   );
@@ -2673,7 +2722,7 @@ function parseDashInsights(text) {
   };
 }
 
-async function generateDashInsights(avgs, correlations, patternsContent, people, entryCount, lastDate) {
+async function generateDashInsights(avgs, correlations, patternsContent, people, entryCount, lastDate, goalsSummary, entries) {
   if (entryCount < 3) return { overview: '', obs: [], missions: [], blindSpot: '' };
 
   const cacheKey = `${lastDate}_${entryCount}`;
@@ -2694,10 +2743,17 @@ async function generateDashInsights(avgs, correlations, patternsContent, people,
     ? correlations.map(c => `- ${c.label}: ${c.delta > 0 ? '+' : ''}${c.delta} (n=${c.n})`).join('\n')
     : 'None detected yet.';
 
-  const patternsExcerpt = patternsContent ? patternsContent.slice(0, 500) : 'No patterns doc yet.';
+  const patternsExcerpt = patternsContent ? patternsContent.slice(0, 1500) : 'No patterns doc yet.';
   const peopleNames = people.filter(p => p.sessions_mentioned >= 3).map(p => `${p.name} (${p.relationship})`).join(', ') || 'None yet.';
+  const goalsLine = goalsSummary ? goalsSummary.trim() : 'Not available.';
 
-  const systemPrompt = `You are Miles's personal intelligence system. Miles (she/her) lives in Manila with rheumatoid arthritis and POTS. You are looking at her last 14 days of health data.
+  const recentNarratives = (entries || [])
+    .slice(-3)
+    .filter(e => e.narrative)
+    .map(e => `- ${e.date}: ${e.narrative}`)
+    .join('\n') || 'None available.';
+
+  const systemPrompt = `You are Miles's personal intelligence system. Miles (she/her) lives in Manila with rheumatoid arthritis and POTS. You are looking at her last 14 days of health data and accumulated session patterns.
 
 Voice: Co-Star. Direct, second-person, slightly oracular. You talk to Miles, not about her.
 
@@ -2732,13 +2788,13 @@ Avoid:
 Output exactly 8 lines. Each line starts with a label. No blank lines.
 
 OVERVIEW: [One sentence. The structural dynamic of this period — not events or data. Speak directly to Miles.]
-OBS1: [Metric name]: [What this reveals about your behavior or trajectory. Direct, second-person. No numbers.]
-OBS2: [Metric name]: [The gap or contradiction this points to. What you're doing or not doing.]
-OBS3: [Metric name]: [Same — meaning, not measurement. What it says about you right now.]
+OBS1: [Metric or tag, e.g. "Diet Adherence" or "Sleep + Goals"]: [Cross-domain pattern — two or more signals moving together that Miles hasn't named. What does it mean, not what happened.]
+OBS2: [Metric or tag]: [Contradiction between what the data shows and what her goals or intentions would predict.]
+OBS3: [Metric or tag]: [Behavior or assumption producing a result she hasn't connected. What is she treating as fixed that isn't?]
 MISSION1: [Verb phrase. Specific, direct address. E.g.: "Track sleep within 30 minutes of waking."]
-MISSION2: [Verb phrase. Specific.]
+MISSION2: [Verb phrase. Specific. Ground it in a pattern or goal gap, not a generic health tip.]
 MISSION3: [Verb phrase. Specific.]
-BLIND_SPOT: [One sentence. What you're consistently avoiding, not naming, or treating as fixed.]`;
+BLIND_SPOT: [One sentence. What she's consistently avoiding, not naming, or treating as outside her control when it isn't.]`;
 
   const userMessage = `${entryCount} entries logged in this period.
 
@@ -2748,7 +2804,13 @@ MENTAL (avg/5): ${mental}
 BEHAVIORAL CORRELATIONS:
 ${corrLines}
 
-PATTERNS EXCERPT:
+ACTIVE GOALS:
+${goalsLine}
+
+RECENT JOURNAL (last 3 entries):
+${recentNarratives}
+
+PATTERNS:
 ${patternsExcerpt}
 
 PEOPLE MENTIONED (3+ sessions):
@@ -2855,12 +2917,14 @@ function renderDash(entries, people, patternsContent, evoEntries, insights) {
   // AI observations
   const obsHTML = insights.obs.length
     ? insights.obs.map(o => {
-        const [label, ...rest] = o.split(':');
+        const colonIdx = o.indexOf(':');
+        const labelCandidate = colonIdx > 0 ? o.slice(0, colonIdx).trim() : '';
+        const hasLabel = labelCandidate.length > 0 && labelCandidate.length <= 30;
         return `<div class="obs-card">
-          ${rest.length ? `<div class="obs-label">${label.trim()}</div><div class="obs-text">${rest.join(':').trim()}</div>` : `<div class="obs-text">${o}</div>`}
+          ${hasLabel ? `<div class="obs-label">${labelCandidate}</div><div class="obs-text">${o.slice(colonIdx + 1).trim()}</div>` : `<div class="obs-text">${o}</div>`}
         </div>`;
       }).join('')
-    : '';
+    : `<div class="dash-empty">Generating observations…</div>`;
 
   const blindSpotHTML = insights.blindSpot
     ? `<div class="obs-card" style="border-color:rgba(224,112,112,0.2)">
@@ -3016,11 +3080,12 @@ async function loadDash() {
   el.innerHTML = '<div class="dash-loading">reading your archive…</div>';
 
   try {
-    const [entries, patternsContent, peopleContent, evolutionContent] = await Promise.all([
+    const [entries, patternsContent, peopleContent, evolutionContent, goalsSummary] = await Promise.all([
       fetchDashEntries(14),
       fetchEntry('notes/patterns.md'),
       fetchEntry('notes/people-profile.md'),
       fetchEntry('notes/evolution.md'),
+      fetchEntry('notes/goals-summary.md'),
     ]);
 
     const people     = parsePeopleProfile(peopleContent);
@@ -3030,7 +3095,7 @@ async function loadDash() {
     const lastDate   = entries.length ? entries[entries.length - 1].date : todayManila();
 
     // Render structure immediately with computed data, then fill in AI insights
-    const insights = await generateDashInsights(avgs, correlations, patternsContent, people, entries.length, lastDate);
+    const insights = await generateDashInsights(avgs, correlations, patternsContent, people, entries.length, lastDate, goalsSummary, entries);
     renderDash(entries, people, patternsContent, evoEntries, insights);
   } catch(err) {
     if (el) el.innerHTML = `<div class="dash-loading">could not load — ${err.message}</div>`;
