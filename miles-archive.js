@@ -368,10 +368,12 @@ When triggering, output the full updated document (replace, not append) wrapped 
 <<<STATE_START>>>
 # State of Miles
 
-*Last updated: ${date}*
+*Last updated: [[${date}]]*
 
 [full updated document content]
 <<<STATE_END>>>
+
+Date format: use [[YYYY-MM-DD]] wikilink format for all specific dates in the document content.
 
 The markers will be stripped from the chat display — Miles will see a save bar for the state doc, separate from the journal entry save.`;
 
@@ -382,34 +384,72 @@ After producing the journal entry, if something notable emerged this session, up
 <<<PATTERNS_START>>>
 # Miles Patterns
 
-*Last updated: ${date}*
+*Last updated: [[${date}]]*
 
-## Health Correlations
-[observation — confirmed Nx — First: YYYY-MM-DD — Last: YYYY-MM-DD]
+**HEALTH**
 
-## Behavioral Patterns
-[observation — confirmed Nx — Last: YYYY-MM-DD — direction: improving/stable/worsening]
+## Sleep Scores
+## SpO2 / Nocturnal Hypoxia
+## Recovery Scores
+## HRV Patterns
+## Resting Heart Rate
+## Illness Events
+## Heart Rate Recovery
+## Autoimmune / Lab Markers
 
-## Emotional Patterns
-[observation — confirmed across N sessions — Last: YYYY-MM-DD]
+**BEHAVIORAL**
 
-## Goal Alignment
-[goal name: status note — last noted: YYYY-MM-DD]
+## Sleep Timing and Duration
+## Physical Activity
+## Habit Tracking
+## Social Response Patterns
+## Medication Adherence
+## Travel Response
 
-## Wins & Milestones
-[YYYY-MM-DD: description]
+**EMOTIONAL**
+
+## Anxiety Triggers
+## Anxiety Relievers
+## Mood Patterns
+## Agoraphobia Manifestations
+## Cognitive Load and Overthinking
+## Relationship / Mik
+## Therapy
+
+**GOALS**
+
+## Actively Working On
+## Progressing but Incomplete
+## Stalled or Not Evidenced
+## Goal Conflicts
+
+**WINS**
+
+## Completed Milestones
+## In Progress
+## Journal Entry Wins
+
+**THREADS**
 
 ## Open Threads
-[topic — first raised: YYYY-MM-DD — status: open/resolved YYYY-MM-DD]
+[topic — first raised: [[YYYY-MM-DD]] — status: open/resolved [[YYYY-MM-DD]]]
 
 ## Declined
-[observation — declined: YYYY-MM-DD — do not repropose until YYYY-MM-DD]
+[observation — declined: [[YYYY-MM-DD]] — do not repropose until [[YYYY-MM-DD]]]
 <<<PATTERNS_END>>>
+
+Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the document.
+
+Section metadata format:
+- Health/Behavioral sections: *confirmed Nx — First: [[YYYY-MM-DD]] — Last: [[YYYY-MM-DD]]*
+- Behavioral sections add: — direction: improving/stable/worsening
+- Emotional sections: *confirmed across N sessions — Last: [[YYYY-MM-DD]]*
+- Goal sections: *last noted: [[YYYY-MM-DD]]*
 
 UPDATE when: a correlation confirmed 3+ times across different days, a behavioral pattern confirmed 4+ times, an emotional pattern across 3+ session narratives, a win worth recording, an open thread opened or closed, a goal stagnant 4+ weeks or actively moving.
 DO NOT update: every session, for single incidents, for things already accurately captured.
 
-When updating, also clean the doc: mark resolved patterns as resolved, remove Declined entries older than 4 weeks, flag health correlations that predate a recent state doc change as "needs review — health context changed [date]." If a pattern's last confirmed date is 8+ weeks ago and hasn't recurred, mark it "needs review — stale."
+When updating, also clean the doc: mark resolved patterns as resolved, remove Declined entries older than 4 weeks, flag health correlations that predate a recent state doc change as "needs review — health context changed [[date]]." If a pattern's last confirmed date is 8+ weeks ago and hasn't recurred, mark it "needs review — stale."
 
 Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
 
@@ -424,19 +464,19 @@ EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "tak
 
 *Observations, named experiences, and threads worth returning to — captured in conversation.*
 
-*Last updated: ${date}*
+*Last updated: [[${date}]]*
 
 ---
 
 ## Return Threads
 
-- [short label](#section-name) — one-line description
+- [[#Section Name|short label]] — one-line description
 
 ---
 
 ## Section Name
 
-**${date}**
+**[[${date}]]**
 Narrative observation in paragraph form.
 
 *Watch: something flagged for follow-up.*
@@ -444,11 +484,14 @@ Narrative observation in paragraph form.
 ---
 <<<CHAT_INSIGHTS_END>>>
 
+Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the document.
+
 Rules:
 - Append new entries to the correct existing section; create a new ## Section if none fit
 - Preserve all prior entries verbatim
 - Add a line to ## Return Threads if the entry has a Watch or Return to note; remove if a prior thread was resolved this session
-- Return Thread anchors must exactly match an existing ## Section header in this file (spaces → hyphens, lowercase). Only add a Return Thread entry if you are also writing the corresponding section body in this same update, OR the section already exists in the current file. Do not create a Return Thread that points to a section you haven't written.
+- Return Thread links use [[#Section Name|label]] format — the section name must exactly match an existing ## header. Only add a Return Thread entry if you are also writing the corresponding section body in this same update, OR the section already exists in the current file. Do not create a Return Thread that points to a section you haven't written.
+- Inline cross-references within entry text also use [[#Section Name|label]] format.
 - When a Watch note has resolved (the thing being watched has happened), update that entry to note the outcome rather than leaving the original Watch line unchanged.
 - UPDATE when: a named experience surfaces, a realization or shift is articulated, Miles signals something is worth keeping
 - DO NOT update: every session, for passing comments, for things already captured`;
@@ -537,7 +580,7 @@ When triggering, output the complete updated file wrapped in markers:
 <<<GOALS_SUMMARY_START>>>
 # Active Goals Summary
 
-*Last updated: ${date}*
+*Last updated: [[${date}]]*
 *Full goals: goals/current.md*
 
 - [Life zone]: [specific outcome or milestone actively in progress]
@@ -606,13 +649,17 @@ Last updated: ${date}
 [full updated section content]
 <<<PATTERNS_END>>>
 
+Date format: use [[YYYY-MM-DD]] wikilink format for all dates in the output.
+
 If nothing warrants updating, output exactly: NO_UPDATE
 
 WHAT TO OUTPUT (changed sections only):
 - ## Open Threads — if any thread was opened, closed/resolved, or updated today
-- ## Wins & Milestones — if a win occurred today
-- ## Goal Alignment — if a goal moved, stalled, or new evidence emerged
-- ## Health Correlations, ## Behavioral Patterns, or ## Emotional Patterns subsection — only if today adds a new data point (new confirmed instance, new bullet, updated Last: date)
+- ## Journal Entry Wins — if a win occurred today
+- ## Actively Working On, ## Progressing but Incomplete, ## Stalled or Not Evidenced, or ## Goal Conflicts — if a goal moved, stalled, or new evidence emerged
+- Any individual health section (## Sleep Scores, ## SpO2 / Nocturnal Hypoxia, ## Recovery Scores, ## HRV Patterns, ## Resting Heart Rate, ## Illness Events, ## Heart Rate Recovery, ## Autoimmune / Lab Markers) — only if today adds a new data point
+- Any individual behavioral section (## Sleep Timing and Duration, ## Physical Activity, ## Habit Tracking, ## Social Response Patterns, ## Medication Adherence, ## Travel Response) — only if today adds a new data point
+- Any individual emotional section (## Anxiety Triggers, ## Anxiety Relievers, ## Mood Patterns, ## Agoraphobia Manifestations, ## Cognitive Load and Overthinking, ## Relationship / Mik, ## Therapy) — only if today adds a new data point
 
 WHAT NEVER TO OUTPUT:
 - Sections where today contributed no new data — leave them untouched
@@ -793,7 +840,7 @@ Also output a ## Review Log Summary section with: wins, stalls, central pattern,
 <<<GOALS_SUMMARY_START>>>
 # Active Goals Summary
 
-*Last updated: ${date}*
+*Last updated: [[${date}]]*
 *Full goals: goals/current.md*
 
 - [zone]: [quarter-specific action] (→ [state])
