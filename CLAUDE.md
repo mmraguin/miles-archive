@@ -1,6 +1,6 @@
 # miles-archive — Project Reference
 
-*Last updated: April 5, 2026. Dashboard tone prompt rewritten. Planned files (people-notes, review-log) added to repo structure.*
+*Last updated: April 5, 2026. All planned features shipped (Review Mode, Goals Summary, People Notes, Evolution optimization, Dashboard tone). Session summary depth increased (20 msgs × 800 chars). Chat-insights anchor integrity rules added. Goals-summary trajectory markers + contradiction trigger added. Review mode goalsSummary instruction strengthened.*
 
 ---
 
@@ -109,35 +109,44 @@ Config access: ⚙ button top-right. Anthropic auto-revokes keys found in chat o
 
 ```javascript
 const S = {
-  messages:         [],   // full Claude conversation history
-  sessionDate:      null, // 'YYYY-MM-DD' Manila
-  sessionDow:       null, // 'Tuesday' etc
-  sessionDay:       null, // 0–6, 0=Sun
-  brief:            false,
-  thinking:         false,
-  pendingEntry:     null,
-  pendingPath:      null,
-  existingEntry:    null,  // today's full file content from GitHub, if any
-  recentEntries:    [],    // [{date, content}] last 3 daily entries, compressed
-  stateOfMiles:     null,  // fetched from notes/state-of-miles.md
-  pendingState:     null,  // state doc update pending save
-  goals:            null,  // fetched from notes/goals-summary.md
-  patterns:         null,  // fetched from notes/patterns.md
-  pendingPatterns:  null,  // patterns doc update pending save
-  chatInsights:     null,  // fetched from notes/chat-insights.md
-  pendingInsights:  null,  // chat insights update pending save
-  deepFetched:      false, // whether FETCH_DEEP has fired this session
-  _queuedPatterns:  null,  // patterns update queued to show after entry bar clears
-  _queuedInsights:  null,  // insights update queued to show after patterns bar clears
-  peopleProfile:    null,  // fetched from notes/people-profile.md
-  pendingPeople:    null,  // people profile update pending save
-  evolution:        null,  // fetched from notes/evolution.md
-  pendingEvolution: null,  // evolution update pending save
-  evoTrigger:       false, // whether evolution entry should be prompted this session
-  _queuedPeople:    null,  // people update queued after patterns bar clears
-  _queuedEvolution: null,  // evolution update queued after people bar clears
-  _reviewFired:     false, // prevents duplicate post-save review calls per session
-  _reviewRunning:   false, // true while background patterns review call is in flight
+  messages:              [],    // full Claude conversation history
+  sessionDate:           null,  // 'YYYY-MM-DD' Manila
+  sessionDow:            null,  // 'Tuesday' etc
+  sessionDay:            null,  // 0–6, 0=Sun
+  brief:                 false,
+  thinking:              false,
+  reviewMode:            false, // true when Review nav button activated
+  pendingEntry:          null,
+  pendingPath:           null,
+  existingEntry:         null,  // today's full file content from GitHub, if any
+  recentEntries:         [],    // [{date, content}] last 3 daily entries, compressed
+  stateOfMiles:          null,  // fetched from notes/state-of-miles.md
+  pendingState:          null,  // state doc update pending save
+  goals:                 null,  // fetched from notes/goals-summary.md
+  patterns:              null,  // fetched from notes/patterns.md
+  pendingPatterns:       null,  // patterns doc update pending save
+  pendingGoalsSummary:   null,  // goals summary update pending save
+  chatInsights:          null,  // fetched from notes/chat-insights.md
+  pendingInsights:       null,  // chat insights update pending save
+  peopleNotes:           null,  // fetched from notes/people-notes.md
+  pendingPeopleNotes:    null,  // people notes update pending save
+  reviewLog:             null,  // fetched from goals/review-log.md
+  pendingReview:         null,  // review entry pending save
+  existingReview:        null,  // current review-log.md content (for incomplete merge)
+  deepFetched:           false, // whether FETCH_DEEP has fired this session
+  _queuedPatterns:       null,  // patterns update queued to show after entry bar clears
+  _queuedGoalsSummary:   null,  // goals summary queued after patterns bar clears
+  _queuedInsights:       null,  // insights update queued after patterns bar clears
+  _queuedPeopleNotes:    null,  // people notes queued after people bar clears
+  peopleProfile:         null,  // fetched from notes/people-profile.md
+  pendingPeople:         null,  // people profile update pending save
+  evolution:             null,  // fetched from notes/evolution.md
+  pendingEvolution:      null,  // evolution update pending save
+  evoTrigger:            false, // whether evolution entry should be prompted this session
+  _queuedPeople:         null,  // people update queued after patterns bar clears
+  _queuedEvolution:      null,  // evolution update queued after people bar clears
+  _reviewFired:          false, // prevents duplicate post-save review calls per session
+  _reviewRunning:        false, // true while background patterns review call is in flight
 };
 ```
 
@@ -148,12 +157,12 @@ const S = {
 `buildSysPrompt()` joins sections with `\n\n`, filtered for truthiness:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleContext → recentContext → graymatterTrend → trendAwareness → fetchDeep → coaching → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → chatInsightsUpdate → peopleUpdate → evolutionUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → trendAwareness → fetchDeep → coaching → reviewOverdue → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → misc
 ```
 
 `stateDoc` is fetched from `notes/state-of-miles.md` at session start. Update whenever health context changes — diagnoses, meds, labs, open threads. Sat/Sun medication reminders injected here.
 
-`goalsContext` is fetched from `notes/goals-summary.md` — 3–5 line active goals summary. Not the full goals doc. Update when priorities shift. Claude references this during conversation to surface goal connections and flag stagnation. Suppressed on hard days / health flares.
+`goalsContext` is fetched from `notes/goals-summary.md` — 3–5 line active goals summary with optional trajectory markers. Not the full goals doc. Claude references this during conversation to surface goal connections and flag stagnation. Suppressed on hard days / health flares. Claude writes it back via `<<<GOALS_SUMMARY_START>>>` markers: always at end of review sessions; conservatively in daily sessions (14-day gate + stagnation/drift threshold, or if confirmed patterns directly contradict a listed goal).
 
 `patternsContext` is fetched from `notes/patterns.md` — Claude's accumulated observations across sessions. Injected as context; Claude uses it without referencing it directly. Updated two ways: (1) Claude may output markers in the main session reply; (2) `triggerPostEntryReview()` fires a background call after every entry or review save using `buildPatternsReviewPrompt()` with merge-mode output (only changed sections). Miles confirms before saving either way.
 
@@ -212,23 +221,29 @@ Entry output (inside `<<<ENTRY_START>>>` / `<<<ENTRY_END>>>`) still uses markdow
 
 ## Save Bar Chain
 
-Save bars queue in order. Each bar shows only after the previous is saved or dismissed:
+Save bars queue in order. Each bar shows only after the previous is saved or dismissed.
 
+**Daily mode:**
 ```
-entry → patterns → insights → people → evolution
+entry → patterns → goals-summary → insights → people → people-notes → evolution
 ```
 
-When Review Mode ships, `review` will slot in ahead of `people` in the cascade.
+**Review mode:**
+```
+review → goals-summary → people-notes → people-profile
+```
 
-- Entry bar: always first. `showSaveBar()` → `saveEntry()` / `dismissSave()`
-- Patterns bar: queued via `S._queuedPatterns` if entry is also present
-- Insights bar: queued via `S._queuedInsights` if entry or patterns is present; lavender (`#a78bfa`) accent
-- People bar: queued via `S._queuedPeople` if entry, patterns, or insights is present
-- Evolution bar: queued via `S._queuedEvolution` — always last
+- Entry / Review bar: always first. `showSaveBar()` / `showReviewBar()`
+- Patterns bar: queued via `S._queuedPatterns` if entry is present (daily only)
+- Goals-summary bar: queued via `S._queuedGoalsSummary` if entry or patterns is present (teal accent)
+- Insights bar: queued via `S._queuedInsights` if entry, patterns, or goals-summary is present; lavender (`#a78bfa`) accent
+- People-notes bar: queued via `S._queuedPeopleNotes` after people; rose accent
+- People bar: queued via `S._queuedPeople` if earlier bars are present
+- Evolution bar: queued via `S._queuedEvolution` — always last in daily mode
 
 If only one type is present (e.g. people with no entry), it shows immediately.
 
-After entry or review saves, `triggerPostEntryReview()` fires in the background (~5–8s). If it produces a patterns update not already in the queue, pat-bar appears after the existing cascade completes.
+After entry or review saves, `triggerPostEntryReview()` fires in the background. If it produces a patterns update not already in the queue, pat-bar appears after the existing cascade completes.
 
 ---
 

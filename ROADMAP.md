@@ -14,12 +14,7 @@ This file tracks feature status and planned work. Update it when features ship, 
 
 ## Planned
 
-- [x] **[Review Mode](#review-mode)** — ad-hoc life-coach session type distinct from daily journaling. Pulls goals, patterns, insights, people notes, evolution. Produces structured review saved to `goals/review-log.md`. Button-triggered in nav. *(Apr 5, 2026)*
-- [x] **[People Notes](#people-notes)** — `notes/people-notes.md`, a prose file for richer per-person narratives. Complements the lean YAML ledger. Fed into daily sessions and review context. *(Apr 5, 2026)*
-- [x] **[Evolution optimization](#evolution-optimization)** — clarify role vs. review, improve entry quality by drawing from patterns + people notes + state-of-miles. Surface evolution entries in review context. Wire post-review evolution suggestion. *(Apr 5, 2026)*
-- [x] **[Dashboard tone](#dashboard-tone)** — AI insights currently read like an academic report. Should sound like Co-Star: direct, personal, second-person address, no hedging or academic framing. *(Apr 5, 2026)*
-- [x] **[Goals summary maintenance](#goals-summary-maintenance)** — give Claude a write path for `notes/goals-summary.md` via markers so it doesn't require human upkeep. Primary trigger: end of a Review session. Secondary: daily sessions where patterns show significant goal drift. *(Apr 5, 2026)*
-- [x] **[Past-midnight session date](#past-midnight-session-date)** — sessions started between midnight and 3am should resolve to the previous day's date for file naming. Client-side fix in `_initSessionMeta()`; no API tokens involved. *(Apr 5, 2026)*
+*(nothing currently — all features shipped)*
 
 ---
 
@@ -56,6 +51,7 @@ This file tracks feature status and planned work. Update it when features ship, 
 - [x] **Review Mode** — `initReviewMode()` fetches all review context; `buildReviewPrompt()` separate system prompt; `<<<REVIEW_START>>>` / `<<<REVIEW_END>>>` markers; `saveReview()` merges incomplete entries; cascade `review → goals-summary → people → people-notes`; amber save bar; review nav button; overdue prompt in daily sessions *(Apr 5, 2026)*
 - [x] **Evolution optimization** — entry quality prompt draws from patterns + people-notes + state-of-miles; post-review evolution suggestion when 90+ days since last entry; dashboard shows last evolution date in section header *(Apr 5, 2026)*
 - [x] **Auto-update patterns.md** — `triggerPostEntryReview()` fires after every entry save (and review save). Separate focused API call (Sonnet, 3500 tokens) with merge-mode output: only changed sections output, `mergePatternsUpdate()` splices them into existing doc. Silent fail; user confirms before save. ~$0.019/session. *(Apr 5, 2026)*
+- [x] **System prompt + data file audit** — chat-insights anchor integrity rule added (Return Threads must match existing ## sections); `## Open Threads` naming bug fixed; session summary depth increased (12→20 msgs, 500→800 chars); goals-summary trajectory markers added (locked vocabulary); contradiction trigger added to daily goals-summary update logic; review mode goalsSummary instruction strengthened to produce quarter-specific lines + Review Log Summary section. Data files repaired: review-log.md paragraph breaks, typo, bullet formatting, PWD card contradiction; chat-insights orphaned Return Threads removed/resolved, missing sections created; goals-summary rewritten with Q2-specific active focuses. *(Apr 5, 2026)*
 
 ---
 
