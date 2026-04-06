@@ -652,6 +652,39 @@ html, body {
 #people-notes-st.err { color: var(--error); }
 #people-notes-st.info { color: var(--text-2); }
 
+/* ── Reflections bar ── */
+#reflections-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#reflections-bar.show { display: flex; }
+#reflections-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#reflections-lbl { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--teal); flex-shrink: 0; }
+#reflections-path { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#reflections-row { display: flex; align-items: center; gap: 14px; }
+#reflections-go {
+  background: none; border: 1px solid var(--teal); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  color: var(--teal); padding: 9px 22px; border-radius: 30px;
+  transition: opacity 0.18s; line-height: 1;
+}
+#reflections-go:hover { opacity: 0.82; }
+#reflections-go:disabled { opacity: 0.2; cursor: not-allowed; }
+#reflections-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0; letter-spacing: 0.1em; text-transform: uppercase; transition: color 0.18s;
+}
+#reflections-no:hover { color: var(--text-2); }
+#reflections-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#reflections-st.show { display: block; }
+#reflections-st.ok  { color: var(--success); }
+#reflections-st.err { color: var(--error); }
+#reflections-st.info { color: var(--text-2); }
+
 /* ── Evolution bar ── */
 #evo-bar {
   display: none; flex-direction: column; gap: 10px;
