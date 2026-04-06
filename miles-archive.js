@@ -48,6 +48,7 @@ const S = {
   reviewLog:          null,  // fetched review-log.md (for overdue check)
   _reviewFired:       false, // prevents duplicate post-save review calls per session
   _reviewRunning:     false, // true while background patterns review call is in flight
+  _deepContext:       null,  // ephemeral deep-fetch context — injected once into next call
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ function friendlyError(err) {
   if (msg.includes('500') || msg.includes('502') || msg.includes('503')) return 'Claude server error — try again';
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('network')) return 'No connection — check your internet';
   if (msg.includes('empty response')) return 'Empty response from Claude — try again';
+  if (msg.includes('too long') || msg.includes('too many tokens') || msg.includes('context_window') || msg.includes('context window')) return 'Session too long — tap New to start fresh';
   return msg;
 }
 
@@ -2154,7 +2156,19 @@ async function sendMsg() {
   showDots();
 
   try {
-    const reply = await callClaude(S.messages);
+    // Cap history at 20 messages, preserving the opening exchange for context
+    let callMessages = S.messages.length > 20
+      ? [...S.messages.slice(0, 2), ...S.messages.slice(-18)]
+      : S.messages;
+    // Inject ephemeral deep context into the current user turn (not stored in S.messages)
+    if (S._deepContext) {
+      callMessages = [
+        ...callMessages.slice(0, -1),
+        { role: 'user', content: callMessages[callMessages.length - 1].content + '\n\n' + S._deepContext },
+      ];
+      S._deepContext = null;
+    }
+    const reply = await callClaude(callMessages);
     hideDots();
     const entry        = S.reviewMode ? null : extractEntry(reply);
     const review       = S.reviewMode ? extractReview(reply) : null;
@@ -2212,10 +2226,8 @@ async function sendMsg() {
       if (firstBar || patterns || goalsSummary || insights || people || peopleNotes) S._queuedEvolution = evolution;
       else showEvoBar(evolution);
     }
-    if (reflections) {
-      // Only queue reflections if they arrived alongside an entry or other cascade items.
-      // Standalone reflections (no entry in this reply) are dropped — they re-fire with the entry.
-      if (firstBar || patterns || goalsSummary || insights || people || peopleNotes || evolution) S._queuedReflections = reflections;
+    if (reflections && firstBar) {
+      S._queuedReflections = reflections;
     }
     if (review) showReviewBar(review);
     else if (entry) showSaveBar(entry, detectType(reply));
@@ -2226,8 +2238,7 @@ async function sendMsg() {
       setStat('thinking', 'pulling more context…');
       fetchDeepEntries().then(deepEntries => {
         if (deepEntries.length) {
-          const ctx = 'DEEPER CONTEXT\n' + deepEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n');
-          S.messages.push({ role: 'user', content: ctx });
+          S._deepContext = 'DEEPER CONTEXT\n' + deepEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n');
           addSys('deeper context loaded');
         }
         setStat('ready', `ready — ${S.sessionDate}`);
@@ -2266,7 +2277,7 @@ function _clearAndStart() {
   S.evolution = null; S.pendingEvolution = null; S.evoTrigger = false; S._queuedEvolution = null;
   S.reflections = null; S.pendingReflections = null; S._queuedReflections = null;
   S.reviewMode = false; S.pendingReview = null; S.existingReview = null; S.reviewLog = null;
-  S._reviewFired = false; S._reviewRunning = false;
+  S._reviewFired = false; S._reviewRunning = false; S._deepContext = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
   document.getElementById('goals-summary-bar').classList.remove('show');
