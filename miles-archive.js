@@ -2,10 +2,10 @@
 const CREDS = {
   get anthropicKey() { return localStorage.getItem('ar_ant')  || ''; },
   get githubToken()  { return localStorage.getItem('ar_gh')   || ''; },
-  get repo()         { return localStorage.getItem('ar_repo') || 'mmraguin/miles-data'; },
+  get repo()         { return localStorage.getItem('ar_repo') || ''; },
 };
 function credsReady() {
-  return CREDS.anthropicKey.length > 10 && CREDS.githubToken.length > 10;
+  return CREDS.anthropicKey.length > 10 && CREDS.githubToken.length > 10 && CREDS.repo.length > 0;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -100,7 +100,10 @@ function pathFor(type, date) {
 
 // ── Base64 helpers (no deprecated escape/unescape) ────────────────────────────
 function b64Encode(str) {
-  return btoa(new TextEncoder().encode(str).reduce((s, b) => s + String.fromCharCode(b), ''));
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
 }
 
 function b64Decode(b64) {
@@ -847,10 +850,11 @@ async function triggerPostEntryReview() {
         showPatBar(merged);
       }
     }
-  } catch(err) {
-    // silent fail — post-review is best-effort
-  } finally {
     S._reviewFired = true;
+  } catch(err) {
+    console.warn('Post-entry review failed:', err.message);
+    // _reviewFired not set — allows one retry if session continues
+  } finally {
     S._reviewRunning = false;
   }
 }
@@ -1325,6 +1329,58 @@ async function getFileInfo(path) {
   return { sha: data.sha, content: b64Decode(data.content.replace(/\n/g, '')) };
 }
 
+// ── GitHub PUT helper ─────────────────────────────────────────────────────────
+// existingSha: pass if already fetched (avoids double getFileInfo); omit to auto-fetch
+async function githubPut(path, content, commitMessage, existingSha) {
+  const sha = existingSha !== undefined ? existingSha : (await getFileInfo(path)).sha;
+  const body = { message: commitMessage, content: b64Encode(content) };
+  if (sha) body.sha = sha;
+  const r = await fetch(
+    `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${CREDS.githubToken}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }
+  );
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('github_401');
+    if (r.status === 403) throw new Error('github_403');
+    if (r.status === 404) throw new Error('repo not found — check repo name in config');
+    if (r.status === 422) throw new Error('file conflict — try fetching and saving again');
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.message || `GitHub error ${r.status}`);
+  }
+}
+
+// ── Save bar cascade ──────────────────────────────────────────────────────────
+// Advances to the next queued save bar after one is saved or dismissed.
+// Daily order:  patterns → goals-summary → insights → people → people-notes → evolution → reflections
+// Review order: goals-summary → people-notes → people
+function advanceCascade() {
+  const daily = [
+    ['_queuedPatterns',     showPatBar],
+    ['_queuedGoalsSummary', showGoalsSummaryBar],
+    ['_queuedInsights',     showInsightsBar],
+    ['_queuedPeople',       showPeopleBar],
+    ['_queuedPeopleNotes',  showPeopleNotesBar],
+    ['_queuedEvolution',    showEvoBar],
+    ['_queuedReflections',  showReflectionsBar],
+  ];
+  const review = [
+    ['_queuedGoalsSummary', showGoalsSummaryBar],
+    ['_queuedPeopleNotes',  showPeopleNotesBar],
+    ['_queuedPeople',       showPeopleBar],
+  ];
+  for (const [key, fn] of (S.reviewMode ? review : daily)) {
+    if (S[key]) { const v = S[key]; S[key] = null; fn(v); return; }
+  }
+}
+
 function setSaveSt(type, txt) {
   const e = document.getElementById('save-st');
   e.className = `show ${type}`; e.textContent = txt;
@@ -1336,37 +1392,7 @@ async function saveEntry() {
   btn.disabled = true;
   setSaveSt('info', 'writing…');
   try {
-    const { sha } = await getFileInfo(S.pendingPath);
-
-    // Claude produces the complete file (YAML frontmatter + all sections) — save wholesale
-    const contentToSave = S.pendingEntry;
-
-    const enc  = b64Encode(contentToSave);
-    const body = {
-      message: `journal: ${S.pendingPath.split('/').pop().replace('.md', '')}`,
-      content: enc,
-    };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${S.pendingPath}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${CREDS.githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      if (r.status === 404) throw new Error('repo not found — check repo name in config');
-      if (r.status === 422) throw new Error('file conflict — try fetching and saving again');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut(S.pendingPath, S.pendingEntry, `journal: ${S.pendingPath.split('/').pop().replace('.md', '')}`);
     setSaveSt('ok', 'saved');
     addSys(`saved → ${S.pendingPath}`);
     triggerPostEntryReview();
@@ -1375,21 +1401,7 @@ async function saveEntry() {
     setTimeout(() => {
       document.getElementById('save-bar').classList.remove('show');
       document.getElementById('save-st').className = '';
-      if (S._queuedPatterns) {
-        const p = S._queuedPatterns; S._queuedPatterns = null; showPatBar(p);
-      } else if (S._queuedGoalsSummary) {
-        const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-      } else if (S._queuedInsights) {
-        const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
-      } else if (S._queuedPeople) {
-        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-      } else if (S._queuedPeopleNotes) {
-        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-      } else if (S._queuedEvolution) {
-        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-      } else if (S._queuedReflections) {
-        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setSaveSt('err', friendlyError(err));
@@ -1401,21 +1413,7 @@ function dismissSave() {
   S.pendingEntry = null; S.pendingPath = null;
   document.getElementById('save-bar').classList.remove('show');
   document.getElementById('save-st').className = '';
-  if (S._queuedPatterns) {
-    const p = S._queuedPatterns; S._queuedPatterns = null; showPatBar(p);
-  } else if (S._queuedGoalsSummary) {
-    const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-  } else if (S._queuedInsights) {
-    const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
-  } else if (S._queuedPeople) {
-    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-  } else if (S._queuedPeopleNotes) {
-    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-  } else if (S._queuedEvolution) {
-    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-  } else if (S._queuedReflections) {
-    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-  }
+  advanceCascade();
 }
 
 // ── State doc save ────────────────────────────────────────────────────────────
@@ -1443,31 +1441,7 @@ async function saveState() {
   btn.disabled = true;
   setStateSt('info', 'writing…');
   try {
-    const path = 'notes/state-of-miles.md';
-    const { sha } = await getFileInfo(path);
-    const body = {
-      message: 'state: update state-of-miles.md',
-      content: b64Encode(S.pendingState),
-    };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${CREDS.githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/state-of-miles.md', S.pendingState, 'state: update state-of-miles.md');
     S.stateOfMiles = S.pendingState; // update in-memory so current session uses new doc
     setStateSt('ok', 'saved');
     addSys('state doc updated → notes/state-of-miles.md');
@@ -1499,19 +1473,7 @@ function dismissPatterns() {
   S.pendingPatterns = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
-  if (S._queuedGoalsSummary) {
-    const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-  } else if (S._queuedInsights) {
-    const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
-  } else if (S._queuedPeople) {
-    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-  } else if (S._queuedPeopleNotes) {
-    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-  } else if (S._queuedEvolution) {
-    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-  } else if (S._queuedReflections) {
-    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-  }
+  advanceCascade();
 }
 
 async function savePatterns() {
@@ -1520,31 +1482,7 @@ async function savePatterns() {
   btn.disabled = true;
   setPatSt('info', 'writing…');
   try {
-    const path = 'notes/patterns.md';
-    const { sha } = await getFileInfo(path);
-    const body = {
-      message: 'patterns: update notes/patterns.md',
-      content: b64Encode(S.pendingPatterns),
-    };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${CREDS.githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/patterns.md', S.pendingPatterns, 'patterns: update notes/patterns.md');
     S.patterns = S.pendingPatterns;
     setPatSt('ok', 'saved');
     addSys('patterns updated → notes/patterns.md');
@@ -1552,19 +1490,7 @@ async function savePatterns() {
     setTimeout(() => {
       document.getElementById('pat-bar').classList.remove('show');
       document.getElementById('pat-st').className = '';
-      if (S._queuedGoalsSummary) {
-        const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-      } else if (S._queuedInsights) {
-        const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
-      } else if (S._queuedPeople) {
-        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-      } else if (S._queuedPeopleNotes) {
-        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-      } else if (S._queuedEvolution) {
-        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-      } else if (S._queuedReflections) {
-        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setPatSt('err', friendlyError(err));
@@ -1589,17 +1515,7 @@ function dismissGoalsSummary() {
   S.pendingGoalsSummary = null;
   document.getElementById('goals-summary-bar').classList.remove('show');
   document.getElementById('goals-summary-st').className = '';
-  if (S._queuedInsights) {
-    const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
-  } else if (S._queuedPeople) {
-    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-  } else if (S._queuedPeopleNotes) {
-    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-  } else if (S._queuedEvolution) {
-    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-  } else if (S._queuedReflections) {
-    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-  }
+  advanceCascade();
 }
 
 async function saveGoalsSummary() {
@@ -1608,31 +1524,7 @@ async function saveGoalsSummary() {
   btn.disabled = true;
   setGoalsSummarySt('info', 'writing…');
   try {
-    const path = 'notes/goals-summary.md';
-    const { sha } = await getFileInfo(path);
-    const body = {
-      message: 'goals-summary: update notes/goals-summary.md',
-      content: b64Encode(S.pendingGoalsSummary),
-    };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${CREDS.githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/goals-summary.md', S.pendingGoalsSummary, 'goals-summary: update notes/goals-summary.md');
     S.goals = S.pendingGoalsSummary;
     setGoalsSummarySt('ok', 'saved');
     addSys('goals summary updated → notes/goals-summary.md');
@@ -1640,17 +1532,7 @@ async function saveGoalsSummary() {
     setTimeout(() => {
       document.getElementById('goals-summary-bar').classList.remove('show');
       document.getElementById('goals-summary-st').className = '';
-      if (S._queuedInsights) {
-        const i = S._queuedInsights; S._queuedInsights = null; showInsightsBar(i);
-      } else if (S._queuedPeople) {
-        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-      } else if (S._queuedPeopleNotes) {
-        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-      } else if (S._queuedEvolution) {
-        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-      } else if (S._queuedReflections) {
-        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setGoalsSummarySt('err', friendlyError(err));
@@ -1675,15 +1557,7 @@ function dismissInsights() {
   S.pendingInsights = null;
   document.getElementById('insights-bar').classList.remove('show');
   document.getElementById('insights-st').className = '';
-  if (S._queuedPeople) {
-    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-  } else if (S._queuedPeopleNotes) {
-    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-  } else if (S._queuedEvolution) {
-    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-  } else if (S._queuedReflections) {
-    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-  }
+  advanceCascade();
 }
 
 async function saveInsights() {
@@ -1692,31 +1566,7 @@ async function saveInsights() {
   btn.disabled = true;
   setInsightsSt('info', 'writing…');
   try {
-    const path = 'notes/chat-insights.md';
-    const { sha } = await getFileInfo(path);
-    const body = {
-      message: 'insights: update notes/chat-insights.md',
-      content: b64Encode(S.pendingInsights),
-    };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${CREDS.githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/chat-insights.md', S.pendingInsights, 'insights: update notes/chat-insights.md');
     S.chatInsights = S.pendingInsights;
     setInsightsSt('ok', 'saved');
     addSys('insights updated → notes/chat-insights.md');
@@ -1724,15 +1574,7 @@ async function saveInsights() {
     setTimeout(() => {
       document.getElementById('insights-bar').classList.remove('show');
       document.getElementById('insights-st').className = '';
-      if (S._queuedPeople) {
-        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-      } else if (S._queuedPeopleNotes) {
-        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-      } else if (S._queuedEvolution) {
-        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-      } else if (S._queuedReflections) {
-        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setInsightsSt('err', friendlyError(err));
@@ -1757,13 +1599,7 @@ function dismissPeople() {
   S.pendingPeople = null;
   document.getElementById('people-bar').classList.remove('show');
   document.getElementById('people-st').className = '';
-  if (S._queuedPeopleNotes) {
-    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-  } else if (S._queuedEvolution) {
-    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-  } else if (S._queuedReflections) {
-    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-  }
+  advanceCascade();
 }
 
 async function savePeople() {
@@ -1772,20 +1608,7 @@ async function savePeople() {
   btn.disabled = true;
   setPeopleSt('info', 'writing…');
   try {
-    const path = 'notes/people-profile.md';
-    const { sha } = await getFileInfo(path);
-    const body = { message: 'people: update notes/people-profile.md', content: b64Encode(S.pendingPeople) };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/people-profile.md', S.pendingPeople, 'people: update notes/people-profile.md');
     S.peopleProfile = S.pendingPeople;
     setPeopleSt('ok', 'saved');
     addSys('people profile updated → notes/people-profile.md');
@@ -1793,13 +1616,7 @@ async function savePeople() {
     setTimeout(() => {
       document.getElementById('people-bar').classList.remove('show');
       document.getElementById('people-st').className = '';
-      if (S._queuedPeopleNotes) {
-        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-      } else if (S._queuedEvolution) {
-        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-      } else if (S._queuedReflections) {
-        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setPeopleSt('err', friendlyError(err));
@@ -1824,11 +1641,7 @@ function dismissPeopleNotes() {
   S.pendingPeopleNotes = null;
   document.getElementById('people-notes-bar').classList.remove('show');
   document.getElementById('people-notes-st').className = '';
-  if (S._queuedEvolution) {
-    const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-  } else if (S._queuedReflections) {
-    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-  }
+  advanceCascade();
 }
 
 async function savePeopleNotes() {
@@ -1837,20 +1650,7 @@ async function savePeopleNotes() {
   btn.disabled = true;
   setPeopleNotesSt('info', 'writing…');
   try {
-    const path = 'notes/people-notes.md';
-    const { sha } = await getFileInfo(path);
-    const body = { message: 'people-notes: update notes/people-notes.md', content: b64Encode(S.pendingPeopleNotes) };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/people-notes.md', S.pendingPeopleNotes, 'people-notes: update notes/people-notes.md');
     S.peopleNotes = S.pendingPeopleNotes;
     setPeopleNotesSt('ok', 'saved');
     addSys('people notes updated → notes/people-notes.md');
@@ -1858,11 +1658,7 @@ async function savePeopleNotes() {
     setTimeout(() => {
       document.getElementById('people-notes-bar').classList.remove('show');
       document.getElementById('people-notes-st').className = '';
-      if (S._queuedEvolution) {
-        const e = S._queuedEvolution; S._queuedEvolution = null; showEvoBar(e);
-      } else if (S._queuedReflections) {
-        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setPeopleNotesSt('err', friendlyError(err));
@@ -1887,13 +1683,7 @@ function dismissReview() {
   S.pendingReview = null;
   document.getElementById('review-bar').classList.remove('show');
   document.getElementById('review-st').className = '';
-  if (S._queuedGoalsSummary) {
-    const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-  } else if (S._queuedPeopleNotes) {
-    const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-  } else if (S._queuedPeople) {
-    const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-  }
+  advanceCascade();
 }
 
 async function saveReview() {
@@ -1902,32 +1692,8 @@ async function saveReview() {
   btn.disabled = true;
   setReviewSt('info', 'writing…');
   try {
-    const path = 'goals/review-log.md';
-    const { sha } = await getFileInfo(path);
     const merged = mergeReviewEntry(S.existingReview, S.pendingReview);
-    const body = {
-      message: 'review: update goals/review-log.md',
-      content: b64Encode(merged),
-    };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${CREDS.githubToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('goals/review-log.md', merged, 'review: update goals/review-log.md');
     S.reviewLog = merged;
     setReviewSt('ok', 'saved');
     addSys('review saved → goals/review-log.md');
@@ -1936,13 +1702,7 @@ async function saveReview() {
     setTimeout(() => {
       document.getElementById('review-bar').classList.remove('show');
       document.getElementById('review-st').className = '';
-      if (S._queuedGoalsSummary) {
-        const gs = S._queuedGoalsSummary; S._queuedGoalsSummary = null; showGoalsSummaryBar(gs);
-      } else if (S._queuedPeopleNotes) {
-        const pn = S._queuedPeopleNotes; S._queuedPeopleNotes = null; showPeopleNotesBar(pn);
-      } else if (S._queuedPeople) {
-        const p = S._queuedPeople; S._queuedPeople = null; showPeopleBar(p);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setReviewSt('err', friendlyError(err));
@@ -1967,9 +1727,7 @@ function dismissEvolution() {
   S.pendingEvolution = null;
   document.getElementById('evo-bar').classList.remove('show');
   document.getElementById('evo-st').className = '';
-  if (S._queuedReflections) {
-    const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-  }
+  advanceCascade();
 }
 
 async function saveEvolution() {
@@ -1978,20 +1736,7 @@ async function saveEvolution() {
   btn.disabled = true;
   setEvoSt('info', 'writing…');
   try {
-    const path = 'notes/evolution.md';
-    const { sha } = await getFileInfo(path);
-    const body = { message: 'evolution: update notes/evolution.md', content: b64Encode(S.pendingEvolution) };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/evolution.md', S.pendingEvolution, 'evolution: update notes/evolution.md');
     S.evolution = S.pendingEvolution;
     S.evoTrigger = false;
     try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {}
@@ -2001,9 +1746,7 @@ async function saveEvolution() {
     setTimeout(() => {
       document.getElementById('evo-bar').classList.remove('show');
       document.getElementById('evo-st').className = '';
-      if (S._queuedReflections) {
-        const r = S._queuedReflections; S._queuedReflections = null; showReflectionsBar(r);
-      }
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setEvoSt('err', friendlyError(err));
@@ -2070,21 +1813,10 @@ async function saveReflections() {
   btn.disabled = true;
   setReflectionsSt('info', 'writing…');
   try {
-    const path = 'notes/reflections.md';
-    const { sha, content: existing } = await getFileInfo(path);
+    // Pre-fetch to get existing content for merge — pass sha to avoid double fetch
+    const { sha, content: existing } = await getFileInfo('notes/reflections.md');
     const merged = mergeReflectionsUpdate(existing, S.pendingReflections);
-    const body = { message: 'reflections: update notes/reflections.md', content: b64Encode(merged) };
-    if (sha) body.sha = sha;
-    const r = await fetch(
-      `https://api.github.com/repos/${CREDS.repo}/contents/${path}`,
-      { method: 'PUT', headers: { 'Authorization': `Bearer ${CREDS.githubToken}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-    );
-    if (!r.ok) {
-      if (r.status === 401) throw new Error('github_401');
-      if (r.status === 403) throw new Error('github_403');
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.message || `GitHub error ${r.status}`);
-    }
+    await githubPut('notes/reflections.md', merged, 'reflections: update notes/reflections.md', sha);
     S.reflections = merged;
     setReflectionsSt('ok', 'saved');
     addSys('reflections updated → notes/reflections.md');
@@ -2235,8 +1967,12 @@ async function sendMsg() {
       if (firstBar || patterns || goalsSummary || insights || people || peopleNotes) S._queuedEvolution = evolution;
       else showEvoBar(evolution);
     }
-    if (reflections && firstBar) {
-      S._queuedReflections = reflections;
+    if (reflections) {
+      if (firstBar || patterns || goalsSummary || insights || people || peopleNotes || evolution) {
+        S._queuedReflections = reflections;
+      } else {
+        showReflectionsBar(reflections);
+      }
     }
     if (review) showReviewBar(review);
     else if (entry) showSaveBar(entry, detectType(reply));
@@ -2742,10 +2478,11 @@ function saveCfg() {
 
   if (!ant || ant.length < 10) { setCfgSt('err', 'Anthropic key missing'); return; }
   if (!gh  || gh.length  < 10) { setCfgSt('err', 'GitHub token missing');  return; }
+  if (!repo)                    { setCfgSt('err', 'Repo name missing');     return; }
 
   localStorage.setItem('ar_ant',  ant);
   localStorage.setItem('ar_gh',   gh);
-  localStorage.setItem('ar_repo', repo || 'mmraguin/miles-data');
+  localStorage.setItem('ar_repo', repo);
 
   setCfgSt('ok', 'saved');
   setTimeout(() => {
