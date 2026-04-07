@@ -162,6 +162,10 @@ function buildSysPrompt() {
     ? 'RECENT ENTRIES\n' + S.recentEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n')
     : '';
 
+  // ── Section: Pre-formatted trend tables (parsed from recent entries)
+  const graymatterTrend = buildGraymatterTrend(S.recentEntries);
+  const reflectionTrend = buildReflectionTrend(S.recentEntries);
+
   // ── Section: Trend awareness
   const trendAwareness = (S.recentEntries.length || S.stateOfMiles) ? `TREND AWARENESS
 You have recent scores, entry narratives, goals, and accumulated patterns. Use them — don't wait to be asked.
@@ -176,9 +180,7 @@ Spot and surface:
 
 When to surface: early in session if clearly notable, or naturally when the topic comes up. One or two things that actually matter — not a full report every session.
 
-Sound like a friend who noticed something, not an analyst reading a report. "Your energy's been pretty low every day you drink" not "alcohol:true days correlate with reduced next-day energy scores." Specific, conversational, no data-voice.
-
-PRIORITY: When Miles is struggling, emotional presence runs first. Health observations second. Goal and pattern intelligence third — it's always on but surfaces only what serves her right now.` : '';
+Sound like a friend who noticed something, not an analyst reading a report. "Your energy's been pretty low every day you drink" not "alcohol:true days correlate with reduced next-day energy scores." Specific, conversational, no data-voice.` : '';
 
   // ── Section: Deep context fetch
   const fetchDeep = `DEEP CONTEXT FETCH
@@ -252,37 +254,29 @@ Behavioral (yes/no): Medications, Alcohol, Wind-down
 Flags (only if mentioned): Panic attack, Near-syncope, Skin changes/purpura, GI symptoms`;
 
   // ── Section: Session openers (first message only)
-  const sessionOpeners = S.messages.length === 0 ? `SESSION OPENERS (use one to open — rotate across sessions, match the hour and energy):
+  const sessionOpeners = S.messages.length === 0 ? `SESSION OPENERS (pick one — match the hour and energy):
 
 Morning (before 12:00):
 - "Good morning. How's your soul before your personality fully loads?"
 - "Morning. What feels true before the day gets loud?"
 - "Early start. What's been happening?" (before 8:00)
-- "Late morning check-in. What's been shaping your mood today?" (9:00–12:00)
 
 Afternoon (12:00–17:59):
 - "Good afternoon. What's been taking up space so far?"
 - "Afternoon. Are we okay, pretending to be okay, or still gathering data?"
-- "Mid-afternoon pause. What needs a reset?"
 
 Evening (18:00–21:59):
 - "Early evening. What stuck with you today?" (18:00–19:00)
-- "Good evening. What do you want to make sense of tonight?"
 - "Evening. What are we debriefing tonight?"
-- "Evening. What needs a little honesty right now?"
 - "Walk me through it."
-- "What's the day been?"
 
 Late night (22:00+):
 - "Late night check-in. What feels heavier after dark?"
 - "Still up. Is this insight, anxiety, or a surprise third thing?"
-- "Hey, night owl. What's keeping your mind on overtime tonight?"
 - "Up late? Let's sort through the emotional tabs you forgot to close."
-- "It's one of those nights. What would feel useful to talk through?"
 
-Anytime (use sparingly as fallback):
+Anytime (fallback):
 - "Ready when you are."
-- "Good to see you. Walk me through your day."
 - "Ready."` : '';
 
   // ── Section: Daily protocol
@@ -298,13 +292,13 @@ Anytime (use sparingly as fallback):
 7. Collect all graymatter fields. Weave context from the full day into the narrative.
 8. When everything is collected, produce the complete entry.
 
-SAME-DAY CONTINUATION (when existing entry is loaded):
+${S.existingEntry ? `SAME-DAY CONTINUATION (when existing entry is loaded):
 - Do not repeat questions already answered in the existing entry.
 - The final output must be ONE combined entry — not two separate sections.
 - Narrative: weave both sessions into a single first-person account of the full day.
 - Graymatter: use the most accurate/updated scores across both sessions.
 - Flags: carry forward any flags from the earlier entry plus any new ones.
-- Notes: append new Notability content to existing notes.
+- Notes: append new Notability content to existing notes.` : ''}
 
 WEEKLY / MONTHLY REVIEW PROTOCOL
 When Miles asks for a weekly or monthly review:
@@ -709,7 +703,7 @@ Always emit this block after every daily entry — it is not optional.`;
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -770,7 +764,7 @@ CLEANUP (apply conservatively):
 
 CORE RULE: Do not output sections you have no new data for. Output only changed sections. Reproduce the full content of each section you do output — do not abbreviate or summarize.
 
-UPDATE THRESHOLD: When in doubt, update. Output a section if today adds any signal — a new data point, a win, a thread opened or closed, a goal that moved or stalled. DO NOT update only if today had no behavioral, emotional, or health content whatsoever.
+UPDATE THRESHOLD: Low bar for wins, open threads, and goal movement — output those sections if any signal exists today. For health, behavioral, and emotional pattern sections, apply the confirmation thresholds above — a single session is not enough to establish or update a pattern. Do not add a new health or behavioral observation after one occurrence.
 
 Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
 }
@@ -2072,7 +2066,7 @@ function _clearAndStart() {
 
 function _initSessionMeta() {
   const today = todayManila();
-  if (hourManila() < 3) {
+  if (hourManila() < 5) {
     const [y, m, d] = today.split('-').map(Number);
     S.sessionDate = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -2202,9 +2196,9 @@ function daysAgo(dateStr, n) {
   return dt.toISOString().slice(0, 10);
 }
 
-// ── Fetch last 3 daily entries in parallel ────────────────────────────────────
-async function fetchRecentEntries() {
-  const dates = [1, 2, 3].map(n => daysAgo(S.sessionDate, n));
+// ── Fetch last N daily entries in parallel (default 3, 4 when date lock fired) ─
+async function fetchRecentEntries(count = 3) {
+  const dates = Array.from({length: count}, (_, i) => daysAgo(S.sessionDate, i + 1));
   const results = await Promise.allSettled(
     dates.map(date =>
       fetchEntry(`journal/daily/${date.slice(0,4)}/${date}.md`).then(content => content ? { date, content } : null)
@@ -2307,8 +2301,9 @@ function buildGraymatterTrend(entries) {
 
 // ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
+  const lockFired = S.sessionDate !== todayManila();
   const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
-    fetchRecentEntries(),
+    fetchRecentEntries(lockFired ? 4 : 3),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
@@ -2338,14 +2333,18 @@ async function startSess() {
   document.getElementById('send-btn').disabled = true;
   showDots();
 
+  const lockFired = S.sessionDate !== todayManila();
   const h = hourManila();
   const hDisplay = (h === 0 || h === 24) ? '0:00' : `${h % 24}:00`;
-  const timeHint = `${hDisplay} (${h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime'})`;
+  const timeHint = lockFired
+    ? `late night in Manila — writing the entry for ${S.sessionDate} (the day just ended)`
+    : `${hDisplay} (${h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime'})`;
 
   // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + review log in parallel
+  // When date lock fired, fetch 4 days back — today's slot is empty by definition, so pull an extra day for context
   const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchTodayEntry(),
-    fetchRecentEntries(),
+    fetchRecentEntries(lockFired ? 4 : 3),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
