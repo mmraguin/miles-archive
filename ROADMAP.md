@@ -2,6 +2,9 @@
 
 *Last updated: 2026-04-07*
 
+→ Project overview and self-hosting: [README.md](README.md)
+→ Implementation context for development: [CLAUDE.md](CLAUDE.md)
+
 This file tracks feature status and planned work. Update it when features ship, stall, or get scoped.
 
 ---
