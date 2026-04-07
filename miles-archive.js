@@ -49,6 +49,7 @@ const S = {
   _reviewFired:       false, // prevents duplicate post-save review calls per session
   _reviewRunning:     false, // true while background patterns review call is in flight
   _deepContext:       null,  // ephemeral deep-fetch context — injected once into next call
+  _cachedSysPrompt:   null,  // memoized system prompt — cleared when state changes mid-session
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -706,6 +707,11 @@ NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactl
   return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
+}
+
+function getSysPrompt() {
+  if (!S._cachedSysPrompt) S._cachedSysPrompt = buildSysPrompt();
+  return S._cachedSysPrompt;
 }
 
 // ── Post-entry patterns review prompt ────────────────────────────────────────
@@ -1450,6 +1456,7 @@ async function saveState() {
   try {
     await githubPut('notes/state-of-miles.md', S.pendingState, 'state: update state-of-miles.md');
     S.stateOfMiles = S.pendingState; // update in-memory so current session uses new doc
+    S._cachedSysPrompt = null;
     setStateSt('ok', 'saved');
     addSys('state doc updated → notes/state-of-miles.md');
     S.pendingState = null;
@@ -1491,6 +1498,7 @@ async function savePatterns() {
   try {
     await githubPut('notes/patterns.md', S.pendingPatterns, 'patterns: update notes/patterns.md');
     S.patterns = S.pendingPatterns;
+    S._cachedSysPrompt = null;
     setPatSt('ok', 'saved');
     addSys('patterns updated → notes/patterns.md');
     S.pendingPatterns = null;
@@ -1533,6 +1541,7 @@ async function saveGoalsSummary() {
   try {
     await githubPut('notes/goals-summary.md', S.pendingGoalsSummary, 'goals-summary: update notes/goals-summary.md');
     S.goals = S.pendingGoalsSummary;
+    S._cachedSysPrompt = null;
     setGoalsSummarySt('ok', 'saved');
     addSys('goals summary updated → notes/goals-summary.md');
     S.pendingGoalsSummary = null;
@@ -1575,6 +1584,7 @@ async function saveInsights() {
   try {
     await githubPut('notes/chat-insights.md', S.pendingInsights, 'insights: update notes/chat-insights.md');
     S.chatInsights = S.pendingInsights;
+    S._cachedSysPrompt = null;
     setInsightsSt('ok', 'saved');
     addSys('insights updated → notes/chat-insights.md');
     S.pendingInsights = null;
@@ -1862,7 +1872,7 @@ async function callClaude(messages, sysOverride = null, retrying = false, maxTok
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: maxTokens,
-        system:     [{ type: 'text', text: sysOverride || buildSysPrompt(), cache_control: { type: 'ephemeral' } }],
+        system:     [{ type: 'text', text: sysOverride || getSysPrompt(), cache_control: { type: 'ephemeral' } }],
         messages,
       }),
     });
@@ -2035,7 +2045,7 @@ function _clearAndStart() {
   S.evolution = null; S.pendingEvolution = null; S.evoTrigger = false; S._queuedEvolution = null;
   S.reflections = null; S.pendingReflections = null; S._queuedReflections = null;
   S.reviewMode = false; S.pendingReview = null; S.existingReview = null; S.reviewLog = null;
-  S._reviewFired = false; S._reviewRunning = false; S._deepContext = null;
+  S._reviewFired = false; S._reviewRunning = false; S._deepContext = null; S._cachedSysPrompt = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
   document.getElementById('goals-summary-bar').classList.remove('show');
