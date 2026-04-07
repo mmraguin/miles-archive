@@ -162,12 +162,6 @@ function buildSysPrompt() {
     ? 'RECENT ENTRIES\n' + S.recentEntries.map(e => `--- ${e.date} ---\n${compressEntry(e.content)}`).join('\n\n')
     : '';
 
-  // ── Section: Graymatter trend (parsed from recent entries)
-  const graymatterTrend = buildGraymatterTrend(S.recentEntries);
-
-  // ── Section: Reflection trend (parsed from recent entries)
-  const reflectionTrend = buildReflectionTrend(S.recentEntries);
-
   // ── Section: Trend awareness
   const trendAwareness = (S.recentEntries.length || S.stateOfMiles) ? `TREND AWARENESS
 You have recent scores, entry narratives, goals, and accumulated patterns. Use them — don't wait to be asked.
@@ -257,34 +251,14 @@ Mental/Emotional (1–5): Mood, Anxiety, Motivation, Social Connection, Cognitiv
 Behavioral (yes/no): Medications, Alcohol, Wind-down
 Flags (only if mentioned): Panic attack, Near-syncope, Skin changes/purpura, GI symptoms`;
 
-  // ── Section: Daily protocol
-  const protocol = `DAILY JOURNAL PROTOCOL
-1. OPEN: Greet Miles with one of the time-appropriate openers from the SESSION OPENERS list below — pick one that fits the hour and energy. Combine it naturally with a one-line ask for bevel data. Keep it to one or two short lines total. e.g. "Good evening. Drop your bevel when you're ready." or "Still up. Share your health data and we'll go from there." Fresh session only — skip bevel ask if an existing entry already has a Health section.
-   If an existing entry was loaded, acknowledge the continuation naturally using the tone from the openers — e.g. "Welcome back. What else happened today?" or "How did the rest of the day go?" — don't re-ask what was already covered.
-2. Once health data is pasted, acknowledge it briefly, then continue the conversation naturally — you've already opened, so no second opener needed.
-3. Let Miles give the overview freely. Do not rush.
-4. Reporter mode: one follow-up at a time. Follow threads — do not interrogate.
-5. Apply coaching posture as the session develops. Observations and pushback are welcome when earned.
-6. Transition to numbers when the narrative feels complete: "Okay — let's do the numbers."
-   If graymatter was already collected in the existing entry, confirm or update scores rather than re-collecting from scratch.
-7. Collect all graymatter fields. Weave context from the full day into the narrative.
-8. When everything is collected, produce the complete entry.
-
-SAME-DAY CONTINUATION (when existing entry is loaded):
-- Do not repeat questions already answered in the existing entry.
-- The final output must be ONE combined entry — not two separate sections.
-- Narrative: weave both sessions into a single first-person account of the full day.
-- Graymatter: use the most accurate/updated scores across both sessions.
-- Flags: carry forward any flags from the earlier entry plus any new ones.
-- Notes: append new Notability content to existing notes.
-
-SESSION OPENERS (use one after health data is received — rotate across sessions, match the hour and energy):
+  // ── Section: Session openers (first message only)
+  const sessionOpeners = S.messages.length === 0 ? `SESSION OPENERS (use one to open — rotate across sessions, match the hour and energy):
 
 Morning (before 12:00):
 - "Good morning. How's your soul before your personality fully loads?"
 - "Morning. What feels true before the day gets loud?"
 - "Early start. What's been happening?" (before 8:00)
-- "Late morning check-in. What's been quietly shaping your mood today?" (9:00–12:00)
+- "Late morning check-in. What's been shaping your mood today?" (9:00–12:00)
 
 Afternoon (12:00–17:59):
 - "Good afternoon. What's been taking up space so far?"
@@ -309,7 +283,28 @@ Late night (22:00+):
 Anytime (use sparingly as fallback):
 - "Ready when you are."
 - "Good to see you. Walk me through your day."
-- "Ready."
+- "Ready."` : '';
+
+  // ── Section: Daily protocol
+  const protocol = `DAILY JOURNAL PROTOCOL
+1. OPEN: Greet Miles with a short time-appropriate opener — match the hour and her energy. Combine it naturally with a one-line ask for bevel data. Keep it to one or two short lines total. Fresh session only — skip bevel ask if an existing entry already has a Health section.
+   If an existing entry was loaded, acknowledge the continuation naturally — e.g. "Welcome back. What else happened today?" or "How did the rest of the day go?" — don't re-ask what was already covered.
+2. Once health data is pasted, acknowledge it briefly, then continue the conversation naturally — you've already opened, so no second opener needed.
+3. Let Miles give the overview freely. Do not rush.
+4. Reporter mode: one follow-up at a time. Follow threads — do not interrogate.
+5. Apply coaching posture as the session develops. Observations and pushback are welcome when earned.
+6. Transition to numbers when the narrative feels complete: "Okay — let's do the numbers."
+   If graymatter was already collected in the existing entry, confirm or update scores rather than re-collecting from scratch.
+7. Collect all graymatter fields. Weave context from the full day into the narrative.
+8. When everything is collected, produce the complete entry.
+
+SAME-DAY CONTINUATION (when existing entry is loaded):
+- Do not repeat questions already answered in the existing entry.
+- The final output must be ONE combined entry — not two separate sections.
+- Narrative: weave both sessions into a single first-person account of the full day.
+- Graymatter: use the most accurate/updated scores across both sessions.
+- Flags: carry forward any flags from the earlier entry plus any new ones.
+- Notes: append new Notability content to existing notes.
 
 WEEKLY / MONTHLY REVIEW PROTOCOL
 When Miles asks for a weekly or monthly review:
@@ -422,17 +417,10 @@ Don't narrate what you're about to do. Don't summarize the session at the end. D
 
 Avoid:
 - Overworked adverbs: "quietly", "deeply", "fundamentally", "remarkably"
-- AI vocabulary: "delve", "certainly", "leverage", "robust", "streamline", "harness", "tapestry", "landscape", "paradigm"
-- Copula dodges: "serves as", "stands as", "marks", "represents" — just say "is"
-- Negative parallelism: "It's not X. It's Y." — use it once if you need it, not as a reflex
-- Fake suspense: "Here's the thing", "Here's the kicker"
-- Rhetorical questions you immediately answer: "The result? Devastating."
-- Patronizing analogies: "Think of it as...", "It's like a..."
-- Bullet-point thinking dressed as sentences: "The first... The second... The third..."
-- Signposted conclusions: "In conclusion", "To sum up"
-- Tricolon pileups — one rule of three is fine, three in a row is a tell
-- Em-dash addiction — use sparingly
-- Too-clever or too-online phrasing — wit should feel sincere, not performed
+- AI vocabulary: "delve", "certainly", "leverage", "tapestry", "paradigm", "robust"
+- Copula dodges: "serves as", "represents" — just say "is"
+- Filler constructs: "Here's the thing", "To sum up", rhetorical questions you immediately answer, "The first… The second…"
+- Tricolon pileups, em-dash overuse, too-online phrasing
 
 Write short when the moment calls for it. Don't soften clinical observations — name them. Emojis occasionally when they land something better than words — not as filler.`;
 
@@ -466,7 +454,9 @@ After producing the journal entry, if something notable emerged this session, up
 
 *Last updated: [[${date}]]*
 
-**HEALTH**
+${S.patterns
+  ? '[full updated document — preserve all existing sections and structure]'
+  : `**HEALTH**
 
 ## Sleep Scores
 ## SpO2 / Nocturnal Hypoxia
@@ -515,7 +505,7 @@ After producing the journal entry, if something notable emerged this session, up
 [topic — first raised: [[YYYY-MM-DD]] — status: open/resolved [[YYYY-MM-DD]]]
 
 ## Declined
-[observation — declined: [[YYYY-MM-DD]] — do not repropose until [[YYYY-MM-DD]]]
+[observation — declined: [[YYYY-MM-DD]] — do not repropose until [[YYYY-MM-DD]]]`}
 <<<PATTERNS_END>>>
 
 Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the document.
@@ -719,7 +709,7 @@ Always emit this block after every daily entry — it is not optional.`;
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -765,10 +755,8 @@ Only add if the theme has appeared 3+ times. Use standard confirmation format.
 WHAT TO OUTPUT (changed sections only):
 - ## Open Threads — if any thread was opened, closed/resolved, or updated today
 - ## Journal Entry Wins — if a win occurred today
-- ## Actively Working On, ## Progressing but Incomplete, ## Stalled or Not Evidenced, or ## Goal Conflicts — if a goal moved, stalled, or new evidence emerged
-- Any individual health section (## Sleep Scores, ## SpO2 / Nocturnal Hypoxia, ## Recovery Scores, ## HRV Patterns, ## Resting Heart Rate, ## Illness Events, ## Heart Rate Recovery, ## Autoimmune / Lab Markers) — only if today adds a new data point
-- Any individual behavioral section (## Sleep Timing and Duration, ## Physical Activity, ## Habit Tracking, ## Social Response Patterns, ## Medication Adherence, ## Travel Response) — only if today adds a new data point
-- Any individual emotional section (## Anxiety Triggers, ## Anxiety Relievers, ## Mood Patterns, ## Agoraphobia Manifestations, ## Cognitive Load and Overthinking, ## Relationship / Mik, ## Therapy) — only if today adds a new data point
+- Any goal section (Actively Working On / Progressing but Incomplete / Stalled or Not Evidenced / Goal Conflicts) — if a goal moved or stalled
+- Any health, behavioral, or emotional section from the doc — only if today adds a new data point
 
 WHAT NEVER TO OUTPUT:
 - Sections where today contributed no new data — leave them untouched
@@ -1874,12 +1862,13 @@ async function callClaude(messages, sysOverride = null, retrying = false, maxTok
         'Content-Type': 'application/json',
         'x-api-key': CREDS.anthropicKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
         model:      'claude-sonnet-4-6',
         max_tokens: maxTokens,
-        system:     sysOverride || buildSysPrompt(),
+        system:     [{ type: 'text', text: sysOverride || buildSysPrompt(), cache_control: { type: 'ephemeral' } }],
         messages,
       }),
     });
@@ -1891,6 +1880,11 @@ async function callClaude(messages, sysOverride = null, retrying = false, maxTok
     if (!data.content?.[0]?.text) throw new Error('empty response');
     return data.content[0].text;
   } catch(err) {
+    if (!retrying && err.message.includes('429')) {
+      setStat('thinking', 'rate limited — retrying in 65s…');
+      await new Promise(r => setTimeout(r, 65000));
+      return callClaude(messages, sysOverride, true, maxTokens);
+    }
     if (!retrying && (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed'))) {
       await new Promise(r => setTimeout(r, 1200));
       return callClaude(messages, sysOverride, true, maxTokens);
@@ -1922,9 +1916,9 @@ async function sendMsg() {
   showDots();
 
   try {
-    // Cap history at 20 messages, preserving the opening exchange for context
+    // Cap history at 20 messages, preserving the opening exchange + Bevel data for context
     let callMessages = S.messages.length > 20
-      ? [...S.messages.slice(0, 2), ...S.messages.slice(-18)]
+      ? [...S.messages.slice(0, 4), ...S.messages.slice(-16)]
       : S.messages;
     // Inject ephemeral deep context into the current user turn (not stored in S.messages)
     if (S._deepContext) {
@@ -1934,7 +1928,7 @@ async function sendMsg() {
       ];
       S._deepContext = null;
     }
-    const reply = await callClaude(callMessages);
+    const reply = await callClaude(callMessages, null, false, 4096);
     hideDots();
     const entry        = S.reviewMode ? null : extractEntry(reply);
     const review       = S.reviewMode ? extractReview(reply) : null;
@@ -2313,7 +2307,7 @@ function buildGraymatterTrend(entries) {
 
 // ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
-  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reflections, reviewLog] = await Promise.all([
+  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchRecentEntries(),
     fetchStateOfMiles(),
     fetchGoals(),
@@ -2322,7 +2316,6 @@ async function loadSessionContext() {
     fetchPeopleProfile(),
     fetchPeopleNotes(),
     fetchEvolution(),
-    fetchReflections(),
     fetchReviewLog(),
   ]);
   S.recentEntries = recentEntries;
@@ -2333,7 +2326,6 @@ async function loadSessionContext() {
   S.peopleProfile = peopleProfile;
   S.peopleNotes   = peopleNotes;
   S.evolution     = evolution;
-  S.reflections   = reflections;
   S.reviewLog     = reviewLog;
   S.evoTrigger    = _computeEvoTrigger(evolution);
   if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }
@@ -2350,8 +2342,8 @@ async function startSess() {
   const hDisplay = (h === 0 || h === 24) ? '0:00' : `${h % 24}:00`;
   const timeHint = `${hDisplay} (${h < 8 ? 'early morning' : h >= 22 ? 'late night' : h >= 18 ? 'evening' : 'daytime'})`;
 
-  // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + reflections + review log in parallel
-  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reflections, reviewLog] = await Promise.all([
+  // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + review log in parallel
+  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(),
     fetchStateOfMiles(),
@@ -2361,7 +2353,6 @@ async function startSess() {
     fetchPeopleProfile(),
     fetchPeopleNotes(),
     fetchEvolution(),
-    fetchReflections(),
     fetchReviewLog(),
   ]);
   S.existingEntry  = existing;
@@ -2373,7 +2364,6 @@ async function startSess() {
   S.peopleProfile  = peopleProfile;
   S.peopleNotes    = peopleNotes;
   S.evolution      = evolution;
-  S.reflections    = reflections;
   S.reviewLog      = reviewLog;
   S.evoTrigger     = _computeEvoTrigger(evolution);
   if (S.evoTrigger) { try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} }
