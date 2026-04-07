@@ -148,14 +148,21 @@ function buildSysPrompt() {
     ? `ACTIVE GOALS\n${S.goals}\n\nReference these as live context — not a checklist. When something Miles says maps to a goal or contradicts one, mention it naturally. When a goal hasn't come up in a while, notice that. On hard days, during health flares, or when emotional presence is needed first — hold this layer entirely. Don't surface goal alignment when she's struggling.`
     : '';
 
-  // ── Section: Accumulated patterns (fetched from notes/patterns.md — active section only)
+  // ── Section: Accumulated patterns (fetched from notes/patterns.md)
+  // patterns.md = what the data shows: behavioral/health correlations confirmed across journal entries and Garmin data.
   const patternsContext = S.patterns
-    ? `ACCUMULATED PATTERNS\n${S.patterns}\n\nThis is your working memory across sessions. Use it — don't reference the doc explicitly, just use what you know. When today confirms or breaks a pattern, that's signal. At session end, after the entry, you can update this doc if something notable emerged — see PATTERNS DOC UPDATES below.`
+    ? `ACCUMULATED PATTERNS\n${S.patterns}\n\nThis is your working memory of what the record shows — confirmed correlations, recurring behavior, health trends. Use it directly, don't reference the doc. When today confirms or breaks a pattern, that's signal. See PATTERNS DOC UPDATES below for when/how to update.`
     : '';
 
   // ── Section: Chat insights (fetched from notes/chat-insights.md)
+  // chat-insights.md = what conversations added: mechanisms explained, reframes that shifted something, patterns named in a way that landed differently.
   const chatInsightsContext = S.chatInsights
-    ? `CHAT INSIGHTS\n${S.chatInsights}\n\nRunning record of named observations, open threads, and reflective insights across sessions. Use as background — don't reference the doc explicitly.`
+    ? `CHAT INSIGHTS\n${S.chatInsights}\n\nWhat conversations have surfaced that wasn't already in the data — specific reframes, mechanisms explained, named experiences. Use as background — don't reference the doc explicitly.`
+    : '';
+
+  // ── Section: Return threads (fetched from notes/threads.md)
+  const threadsContext = S.threads
+    ? `RETURN THREADS\n${S.threads}\n\nConsolidated open threads — [pattern] entries are data-derived (detail in patterns.md), [insight] entries are conversation-derived (detail in chat-insights.md). Use to notice when something open is touched on today. See THREADS UPDATE below for when/how to update.`
     : '';
 
   // ── Section: Recent entries (last 3 days, compressed: YAML + first Narrative paragraph)
@@ -479,6 +486,7 @@ ${S.patterns
 ## Agoraphobia Manifestations
 ## Cognitive Load and Overthinking
 ## Relationship / Mik
+## Family Dynamics
 ## Therapy
 
 **GOALS**
@@ -486,21 +494,7 @@ ${S.patterns
 ## Actively Working On
 ## Progressing but Incomplete
 ## Stalled or Not Evidenced
-## Goal Conflicts
-
-**WINS**
-
-## Completed Milestones
-## In Progress
-## Journal Entry Wins
-
-**THREADS**
-
-## Open Threads
-[topic — first raised: [[YYYY-MM-DD]] — status: open/resolved [[YYYY-MM-DD]]]
-
-## Declined
-[observation — declined: [[YYYY-MM-DD]] — do not repropose until [[YYYY-MM-DD]]]`}
+## Goal Conflicts`}
 <<<PATTERNS_END>>>
 
 Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the document.
@@ -511,10 +505,8 @@ Section metadata format:
 - Emotional sections: *confirmed across N sessions — Last: [[YYYY-MM-DD]]*
 - Goal sections: *last noted: [[YYYY-MM-DD]]*
 
-UPDATE when: a correlation confirmed 3+ times across different days, a behavioral pattern confirmed 4+ times, an emotional pattern across 3+ session narratives, a win worth recording, an open thread opened or closed, a goal stagnant 4+ weeks or actively moving.
-DO NOT update: every session, for single incidents, for things already accurately captured.
-
-Entry ordering: within list-based sections (Journal Entry Wins, Completed Milestones, In Progress, Open Threads, Declined), newest entries first.
+UPDATE when: a correlation confirmed 3+ times across different days, a behavioral pattern confirmed 4+ times, an emotional pattern across 3+ session narratives, a goal stagnant 4+ weeks or actively moving. Clinical lab values belong in state-of-miles.md, not here — patterns.md holds the behavioral/functional implications of health data.
+DO NOT update: every session, for single incidents, for things already accurately captured, for wins (those go in reflections.md).
 
 When updating, also clean the doc: mark resolved patterns as resolved, remove Declined entries older than 4 weeks, flag health correlations that predate a recent state doc change as "needs review — health context changed [[date]]." If a pattern's last confirmed date is 8+ weeks ago and hasn't recurred, mark it "needs review — stale."
 
@@ -522,22 +514,16 @@ Causation note: name what the data shows, not what caused it. "Energy tends to b
 
   // ── Section: Chat insights update instructions
   const chatInsightsUpdate = `CHAT INSIGHTS UPDATES
-If this session surfaced a named observation, a realization, or a thread worth returning to — output the complete updated notes/chat-insights.md wrapped in markers.
+chat-insights.md captures what conversations added that wasn't already in the data — mechanisms explained, reframes that shifted something, patterns named in a way that landed differently. It does NOT contain ongoing data flags, clinical tracking, or behavioral patterns from the journal record (those belong in patterns.md). If this session surfaced a genuine insight of this kind, output the complete updated notes/chat-insights.md wrapped in markers.
 
 EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "take note", "remember this", "add this to insights", "log this", or otherwise directly asks you to record something — treat this as an unambiguous instruction to output the markers. Do not respond conversationally and skip the markers. Output the markers.
 
 <<<CHAT_INSIGHTS_START>>>
 # Chat Insights
 
-*Observations, named experiences, and threads worth returning to — captured in conversation.*
+*What conversations surfaced that the journal alone didn't — mechanisms explained, reframes, named experiences.*
 
 *Last updated: [[${date}]]*
-
----
-
-## Return Threads
-
-- [[#Section Name|short label]] — one-line description
 
 ---
 
@@ -556,12 +542,10 @@ Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the doc
 Rules:
 - Prepend new entries at the top of the correct existing section (newest first); create a new ## Section if none fit
 - Preserve all prior entries verbatim
-- Add a line to ## Return Threads if the entry has a Watch or Return to note; remove if a prior thread was resolved this session
-- Return Thread links use [[#Section Name|label]] format — the section name must exactly match an existing ## header. Only add a Return Thread entry if you are also writing the corresponding section body in this same update, OR the section already exists in the current file. Do not create a Return Thread that points to a section you haven't written.
-- Inline cross-references within entry text also use [[#Section Name|label]] format.
-- When a Watch note has resolved (the thing being watched has happened), update that entry to note the outcome rather than leaving the original Watch line unchanged.
-- UPDATE when: a named experience surfaces, a realization or shift is articulated, Miles signals something is worth keeping
-- DO NOT update: every session, for passing comments, for things already captured`;
+- Inline cross-references within entry text use [[#Section Name|label]] format
+- When a Watch note has resolved, update that entry to note the outcome
+- UPDATE when: a mechanism is explained, a reframe shifts something, a named experience surfaces that the data alone didn't surface
+- DO NOT update: for behavioral patterns confirmed across journal entries (those go in patterns.md), for clinical flags (state-of-miles.md), for passing comments, for things already captured`;
 
   // ── Section: People notes context (not injected in brief mode)
   const peopleNotesContext = (!S.brief && S.peopleNotes)
@@ -597,6 +581,51 @@ Rules:
 - Update relationship or themes if context changed this session
 - Output the full file preserving all existing entries
 - Only emit if at least one named person was mentioned today`;
+
+  // ── Section: Threads update instructions
+  const threadsUpdate = `THREADS UPDATE
+notes/threads.md is the consolidated return list — tagged [pattern] (data-derived, detail in patterns.md) or [insight] (conversation-derived, detail in chat-insights.md). Three sections: Watch (passive monitoring from chat-insights *Watch:* items), Open (active inquiry), Closed (resolved). Update it when a thread opens, closes, changes status, or a new Watch item appears in chat-insights. Output the complete updated file wrapped in markers — it will be auto-saved silently.
+
+<<<THREADS_START>>>
+---
+tags: [threads]
+last_updated: [[${date}]]
+---
+
+# Return Threads
+
+*Last updated: [[${date}]]*
+
+*Consolidated threads from patterns (data-derived, \`[pattern]\`) and chat-insights (conversation-derived, \`[insight]\`). Watch = passive monitoring; Open = active inquiry; Closed = resolved.*
+
+---
+
+## Open
+
+- \`[pattern]\` **Thread name** — brief description — *first: [[YYYY-MM-DD]]*
+- \`[insight]\` **Thread name** — brief description — *[[YYYY-MM-DD]]*
+
+---
+
+## Watch
+
+- \`[insight]\` **Thread name** — brief description — *[[YYYY-MM-DD]]*
+
+---
+
+## Closed
+
+- \`[pattern]\` **Thread name** — outcome — *closed: [[YYYY-MM-DD]]*
+<<<THREADS_END>>>
+
+Rules:
+- Preserve all existing threads; update status when something resolves
+- Move resolved threads to Closed with a brief outcome note
+- Add new threads when a pattern opens or an insight surfaces that warrants active inquiry
+- Scan CHAT INSIGHTS for \`*Watch:\` items; if any are not already in the Watch section, add them as \`[insight]\` entries
+- When a Watch item resolves, move it to Closed with a brief outcome note
+- Keep labels short — one line per thread
+- UPDATE when: a thread opens, closes, its description needs correcting, or a new Watch item appears in chat-insights. DO NOT update every session.`;
 
   // ── Section: People notes update instructions (suppressed in brief mode)
   const peopleNotesUpdate = S.brief ? '' : `PEOPLE NOTES UPDATES
@@ -704,7 +733,7 @@ Always emit this block after every daily entry — it is not optional.`;
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, threadsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, threadsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -753,24 +782,20 @@ If today's reflection data (gratitude, wins, memory from the session) reveals a 
 Only add if the theme has appeared 3+ times. Use standard confirmation format.
 
 WHAT TO OUTPUT (changed sections only):
-- ## Open Threads — if any thread was opened, closed/resolved, or updated today
-- ## Journal Entry Wins — if a win occurred today
 - Any goal section (Actively Working On / Progressing but Incomplete / Stalled or Not Evidenced / Goal Conflicts) — if a goal moved or stalled
 - Any health, behavioral, or emotional section from the doc — only if today adds a new data point
 
 WHAT NEVER TO OUTPUT:
 - Sections where today contributed no new data — leave them untouched
-- ## Declined unless a new decline occurred
 - Existing bullet wording — append new bullets, never rephrase existing ones
 - First: dates — immutable once set
 
 CLEANUP (apply conservatively):
-- Resolve an Open Thread only if it was explicitly resolved today
 - Flag a health/behavioral entry as stale only if its Last: date is visibly 8+ weeks before ${date} and no new data came in today
 
 CORE RULE: Do not output sections you have no new data for. Output only changed sections. Reproduce the full content of each section you do output — do not abbreviate or summarize.
 
-UPDATE THRESHOLD: Low bar for wins, open threads, and goal movement — output those sections if any signal exists today. For health, behavioral, and emotional pattern sections, apply the confirmation thresholds above — a single session is not enough to establish or update a pattern. Do not add a new health or behavioral observation after one occurrence.
+UPDATE THRESHOLD: For health, behavioral, and emotional pattern sections, apply the confirmation thresholds above — a single session is not enough to establish or update a pattern. Wins go in reflections.md, thread changes go in threads.md via THREADS UPDATE.
 
 Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
 }
@@ -1288,6 +1313,13 @@ function extractChatInsights(txt) {
   return txt.slice(s + 25, e).trim();
 }
 
+function extractThreads(txt) {
+  const s = txt.indexOf('<<<THREADS_START>>>');
+  const e = txt.indexOf('<<<THREADS_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 19, e).trim();
+}
+
 function extractPeopleNotes(txt) {
   const s = txt.indexOf('<<<PEOPLE_NOTES_START>>>');
   const e = txt.indexOf('<<<PEOPLE_NOTES_END>>>');
@@ -1573,6 +1605,7 @@ function dismissInsights() {
   S.pendingInsights = null;
   document.getElementById('insights-bar').classList.remove('show');
   document.getElementById('insights-st').className = '';
+  saveThreads();
   advanceCascade();
 }
 
@@ -1591,11 +1624,27 @@ async function saveInsights() {
     setTimeout(() => {
       document.getElementById('insights-bar').classList.remove('show');
       document.getElementById('insights-st').className = '';
+      saveThreads();
       advanceCascade();
     }, 2400);
   } catch(err) {
     setInsightsSt('err', friendlyError(err));
     btn.disabled = false;
+  }
+}
+
+// ── Threads auto-save (no bar — fires silently after insights saves or dismisses) ──
+async function saveThreads() {
+  if (!S._pendingThreads) return;
+  const content = S._pendingThreads;
+  S._pendingThreads = null;
+  try {
+    await githubPut('notes/threads.md', content, 'threads: update notes/threads.md');
+    S.threads = content;
+    S._cachedSysPrompt = null;
+    addSys('threads updated → notes/threads.md');
+  } catch(err) {
+    addSys(`threads save failed: ${friendlyError(err)}`);
   }
 }
 
@@ -1940,6 +1989,7 @@ async function sendMsg() {
     const patterns     = extractPatterns(reply);
     const goalsSummary = extractGoalsSummary(reply);
     const insights     = extractChatInsights(reply);
+    const threads      = extractThreads(reply);
     const people       = extractPeople(reply);
     const peopleNotes  = extractPeopleNotes(reply);
     const evolution    = extractEvolution(reply);
@@ -1953,6 +2003,7 @@ async function sendMsg() {
     if (patterns)     disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
     if (goalsSummary) disp = disp.replace(/<<<GOALS_SUMMARY_START>>>[\s\S]*?<<<GOALS_SUMMARY_END>>>/g, '').trim();
     if (insights)     disp = disp.replace(/<<<CHAT_INSIGHTS_START>>>[\s\S]*?<<<CHAT_INSIGHTS_END>>>/g, '').trim();
+    if (threads)      disp = disp.replace(/<<<THREADS_START>>>[\s\S]*?<<<THREADS_END>>>/g, '').trim();
     if (people)       disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
     if (peopleNotes)  disp = disp.replace(/<<<PEOPLE_NOTES_START>>>[\s\S]*?<<<PEOPLE_NOTES_END>>>/g, '').trim();
     if (evolution)    disp = disp.replace(/<<<EVOLUTION_START>>>[\s\S]*?<<<EVOLUTION_END>>>/g, '').trim();
@@ -1966,6 +2017,8 @@ async function sendMsg() {
     const firstBar = S.reviewMode ? review : entry;
     // Queue order (daily):  entry → patterns → goals-summary → insights → people → people-notes → evolution → reflections
     // Queue order (review): review → goals-summary → people-notes → people-profile
+    // threads auto-saves silently after insights bar confirms or dismisses — no bar in cascade
+    if (threads) S._pendingThreads = threads;
     if (patterns) {
       if (firstBar) S._queuedPatterns = patterns;
       else showPatBar(patterns);
@@ -2134,6 +2187,7 @@ function fetchGoals()         { return fetchEntry('notes/goals-summary.md'); }
 function fetchGoalsFull()     { return fetchEntry('goals/current.md'); }
 function fetchPatterns()      { return fetchEntry('notes/patterns.md'); }
 function fetchChatInsights()  { return fetchEntry('notes/chat-insights.md'); }
+function fetchThreads()       { return fetchEntry('notes/threads.md'); }
 function fetchPeopleProfile() { return fetchEntry('notes/people-profile.md'); }
 function fetchPeopleNotes()   { return fetchEntry('notes/people-notes.md'); }
 function fetchEvolution()      { return fetchEntry('notes/evolution.md'); }
@@ -2352,13 +2406,14 @@ async function startSess() {
 
   // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + review log in parallel
   // When date lock fired, fetch 4 days back — today's slot is empty by definition, so pull an extra day for context
-  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
+  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, threads, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(lockFired ? 4 : 3),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
     fetchChatInsights(),
+    fetchThreads(),
     fetchPeopleProfile(),
     fetchPeopleNotes(),
     fetchEvolution(),
@@ -2370,6 +2425,7 @@ async function startSess() {
   S.goals          = goals;
   S.patterns       = patterns;
   S.chatInsights   = chatInsights;
+  S.threads        = threads;
   S.peopleProfile  = peopleProfile;
   S.peopleNotes    = peopleNotes;
   S.evolution      = evolution;

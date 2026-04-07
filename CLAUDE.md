@@ -41,7 +41,7 @@ No hardcoded keys. Stored in `localStorage`:
 
 **Max tokens:** `2500` default in `callClaude()` (optional 4th param). Main `sendMsg` passes `4096`. Post-entry review uses `3500`.
 
-**System prompt memoization:** `getSysPrompt()` wraps `buildSysPrompt()` — builds once per session, stored in `S._cachedSysPrompt`. Invalidated when state.md, patterns.md, goals-summary.md, or chat-insights.md are saved mid-session. Cleared on session reset.
+**System prompt memoization:** `getSysPrompt()` wraps `buildSysPrompt()` — builds once per session, stored in `S._cachedSysPrompt`. Invalidated when state.md, patterns.md, goals-summary.md, chat-insights.md, or threads.md are saved mid-session. Cleared on session reset.
 
 **Timezone:** All date logic uses `Asia/Manila` via `Intl.DateTimeFormat`. Never use `Date()` offsets.
 
@@ -62,7 +62,7 @@ No hardcoded keys. Stored in `localStorage`:
 `getSysPrompt()` memoizes `buildSysPrompt()` in `S._cachedSysPrompt`. Sections joined with `\n\n`, filtered for truthiness:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → sessionOpeners → fetchDeep → coaching → reviewOverdue → briefMode → reflectionElicitation → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionsUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → threadsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → sessionOpeners → fetchDeep → coaching → reviewOverdue → briefMode → reflectionElicitation → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → threadsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionsUpdate → misc
 ```
 
 Non-obvious notes:
@@ -71,6 +71,12 @@ Non-obvious notes:
 - `fetchDeep` fires once per session (`deepFetched` guard); result stored in `S._deepContext`, appended to next outgoing message then cleared
 - `briefMode` section only present when `S.brief === true`
 - `evolutionUpdate` only injected when 90+ days since last entry (or none exists) and 7+ days since last offered
+- `threadsUpdate` outputs `<<<THREADS_START>>>` / `<<<THREADS_END>>>` markers; threads.md is auto-saved silently after insights bar confirms — no separate save bar
+
+**File distinctions (patterns vs. chat-insights):**
+- `patterns.md` = what the *data* shows — behavioral/health correlations confirmed across journal entries and Garmin data. Answers: *what does the record show?*
+- `chat-insights.md` = what *conversations* added — mechanisms explained, reframes that shifted something, patterns named in a way that landed differently. Answers: *what did the chat surface that the journal alone didn't?*
+- `threads.md` = consolidated return list derived from both; tagged `[pattern]` or `[insight]`; retrieved cheaply as a single file
 
 ---
 
@@ -80,6 +86,8 @@ Non-obvious notes:
 **Review:** `review → goals-summary → people-notes → people-profile`
 
 Each bar queued via `S._queued*`. After entry/review saves, `triggerPostEntryReview()` fires in background — if it produces a patterns update not already in the queue, pat-bar appends after cascade completes.
+
+**threads.md auto-save:** No save bar. When `S._pendingThreads` is set and the insights bar confirms (or is dismissed), `saveThreads()` fires silently. Cache is invalidated after save.
 
 ---
 
