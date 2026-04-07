@@ -1,6 +1,6 @@
 # miles-archive — Project Reference
 
-*Last updated: April 6, 2026. All notes files now use reverse-chronological ordering (newest first). reflections.md restructured from per-day entries to three type sections (## Gratitude, ## Wins, ## Memory) — one item per session per type; `mergeReflectionsUpdate()` prepends to each section. chat-insights entries now prepend to section tops. patterns.md list sections (Journal Entry Wins, Completed Milestones, In Progress, Open Threads, Declined) ordered newest first.*
+*Last updated: April 7, 2026. fetchDeep window narrowed 4–14 → 4–10 days. `getSysPrompt()` memoization added (`S._cachedSysPrompt`) — system prompt built once per session, cache invalidated on state/patterns/goals/insights saves. `sendMsg` max_tokens raised to 4096. `S._deepContext` added for ephemeral deep-fetch injection.*
 
 ---
 
@@ -70,7 +70,7 @@ No hardcoded keys. Both stored in `localStorage` on each device:
 const CREDS = {
   get anthropicKey() { return localStorage.getItem('ar_ant')  || ''; },
   get githubToken()  { return localStorage.getItem('ar_gh')   || ''; },
-  get repo()         { return localStorage.getItem('ar_repo') || 'mmraguin/miles-archive'; },
+  get repo()         { return localStorage.getItem('ar_repo') || ''; },
 };
 ```
 
@@ -89,7 +89,9 @@ Config access: ⚙ button top-right. Anthropic auto-revokes keys found in chat o
 'anthropic-dangerous-direct-browser-access': 'true',  // missing = CORS fail
 ```
 
-**Max tokens:** `2500` default in `callClaude()` (optional 4th param `maxTokens`). Post-entry review uses `3500`. Full entries run 600–900 tokens output.
+**Max tokens:** `2500` default parameter in `callClaude()` (optional 4th param `maxTokens`). Main `sendMsg` call passes `4096`. Post-entry review uses `3500`. Full entries run 600–900 tokens output.
+
+**System prompt memoization:** `getSysPrompt()` wraps `buildSysPrompt()` — builds once per session, stores in `S._cachedSysPrompt`. Invalidated (set to `null`) when state.md, patterns.md, goals-summary.md, or chat-insights.md are saved mid-session. Cleared on session reset.
 
 **Timezone:** All date logic uses `Asia/Manila` via `Intl.DateTimeFormat`. Never use `Date()` offsets.
 
@@ -150,6 +152,8 @@ const S = {
   _queuedReflections:    null,  // reflections queued after evolution bar clears
   _reviewFired:          false, // prevents duplicate post-save review calls per session
   _reviewRunning:        false, // true while background patterns review call is in flight
+  _deepContext:          null,  // ephemeral deep-fetch context — appended to next user message, then cleared
+  _cachedSysPrompt:      null,  // memoized system prompt — cleared when context docs change mid-session
 };
 ```
 
@@ -157,10 +161,10 @@ const S = {
 
 ## System Prompt Architecture
 
-`buildSysPrompt()` joins sections with `\n\n`, filtered for truthiness:
+`buildSysPrompt()` joins sections with `\n\n`, filtered for truthiness. Wrapped by `getSysPrompt()` which memoizes the result in `S._cachedSysPrompt` for the session:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → fetchDeep → coaching → reviewOverdue → briefMode → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionElicitation → reflectionsUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → sessionOpeners → fetchDeep → coaching → reviewOverdue → briefMode → reflectionElicitation → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionsUpdate → misc
 ```
 
 `stateDoc` is fetched from `notes/state-of-miles.md` at session start. Update whenever health context changes — diagnoses, meds, labs, open threads. Sat/Sun medication reminders injected here.
@@ -185,7 +189,7 @@ identity → context → stateDoc → goalsContext → patternsContext → chatI
 
 `graymatterTrend` is parsed from YAML frontmatter of recent entries — compact score table for pattern spotting.
 
-`fetchDeep` section instructs Claude when to emit `<<<FETCH_DEEP>>>` — triggers a background fetch of entries 4–14 days ago, injected compressed into `S.messages` for the next API call. Only fires once per session, never during brief mode.
+`fetchDeep` section instructs Claude when to emit `<<<FETCH_DEEP>>>` — triggers a background fetch of entries 4–10 days ago via `fetchDeepEntries()`. Results stored in `S._deepContext` and appended to the next outgoing user message (not stored in `S.messages`). Only fires once per session (`deepFetched` guard), never during brief mode.
 
 `briefMode` section only present when `S.brief === true`.
 `voice` section always present — sets conversational tone, prohibits markdown in chat, adds HOW TO RESPOND interaction rules.

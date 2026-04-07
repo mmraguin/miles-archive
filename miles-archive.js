@@ -2185,9 +2185,9 @@ function _computeEvoTrigger(evolutionContent) {
   return daysSince >= 90 && daysSinceOffered >= 7;
 }
 
-// ── Fetch entries 4–14 days ago in parallel (triggered by <<<FETCH_DEEP>>>) ───
+// ── Fetch entries 4–10 days ago in parallel (triggered by <<<FETCH_DEEP>>>) ───
 async function fetchDeepEntries() {
-  const dates = [4,5,6,7,8,9,10,11,12,13,14].map(n => daysAgo(S.sessionDate, n));
+  const dates = [4,5,6,7,8,9,10].map(n => daysAgo(S.sessionDate, n));
   const results = await Promise.allSettled(
     dates.map(date =>
       fetchEntry(`journal/daily/${date.slice(0,4)}/${date}.md`).then(content => content ? { date, content } : null)
