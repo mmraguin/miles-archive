@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&family=DM+Mono:wght@300;400&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Mono:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Mono:wght@400;700&display=swap');
 
 :root {
   --bg:          #0a0a0a;
@@ -350,8 +350,9 @@ body::before {
   -webkit-backdrop-filter: blur(8px);
   padding: 10px 16px 11px;
   color: var(--text);
-  font-family: 'Crimson Text', serif;
-  font-style: italic;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 400;
+  font-style: normal;
   font-size: 13px;
   line-height: 1.7;
 }
@@ -370,7 +371,8 @@ body::before {
 
 .msg.assistant .bub {
   color: var(--text-2);
-  font-family: 'Crimson Text', serif;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 300;
   font-size: 13px;
   line-height: 1.85;
   max-width: 96%;
@@ -391,6 +393,33 @@ body::before {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
+
+/* Copy action */
+.msg-actions {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.msg.assistant:hover .msg-actions { opacity: 1; }
+.copy-btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  background: rgba(17,17,17,0.7);
+  border: 1px solid rgba(232,232,232,0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.copy-btn:hover { color: var(--teal); border-color: rgba(78,205,180,0.2); }
+.copy-btn.copied { color: var(--teal); }
 
 /* Typing indicator */
 .dots { display: flex; gap: 5px; padding: 14px 2px 6px; align-items: center; }
@@ -662,9 +691,10 @@ body::before {
   flex: 1;
   background: transparent; border: none;
   color: var(--text);
-  font-family: 'Crimson Text', serif;
+  font-family: 'Manrope', sans-serif;
+  font-weight: 400;
   font-size: 16px; /* must be 16px+ to prevent iOS auto-zoom on focus */
-  font-style: italic;
+  font-style: normal;
   line-height: 1.6;
   padding: 3px 0;
   resize: none; outline: none;

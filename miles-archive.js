@@ -1156,10 +1156,26 @@ function addMsg(role, txt) {
     } else {
       b.textContent = txt;
     }
+    w.appendChild(b);
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.textContent = 'copy';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(txt).then(() => {
+        copyBtn.textContent = 'copied';
+        copyBtn.classList.add('copied');
+        setTimeout(() => { copyBtn.textContent = 'copy'; copyBtn.classList.remove('copied'); }, 1500);
+      }).catch(() => {});
+    });
+    actions.appendChild(copyBtn);
+    w.appendChild(actions);
   } else {
     b.textContent = txt;
+    w.appendChild(b);
   }
-  w.appendChild(b); c.appendChild(w);
+  c.appendChild(w);
   c.scrollTop = c.scrollHeight;
   return b;
 }
