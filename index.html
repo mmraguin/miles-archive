@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="miles-archive.css?v=2">
 </head>
 <body>
+<div class="constellation" id="stars"></div>
 <div id="app">
 
   <div id="header">
@@ -15,12 +16,9 @@
       <div id="wm-date"></div>
     </div>
     <div id="nav">
-      <button class="nav-btn" id="brief-btn" onclick="toggleBrief()">brief</button>
-      <button class="nav-btn" id="review-btn" onclick="initReviewMode()">review</button>
-      <button class="nav-btn" onclick="openFetch()">fetch</button>
-      <button class="nav-btn" onclick="newSess()">new</button>
-      <a class="nav-btn" href="dashboard.html">dash</a>
-      <button class="nav-btn" id="cfg-btn" onclick="openCfg()">⚙</button>
+      <span id="review-ind" class="nav-review-ind">review</span>
+      <a class="nav-dash" href="dashboard.html">dash</a>
+      <button class="nav-more" onclick="openMore()" aria-label="More">···</button>
     </div>
   </div>
 
@@ -168,6 +166,50 @@
 
 </div>
 
+<!-- More overlay -->
+<div class="ov" id="more-ov" onclick="ocMore(event)">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="more-rows">
+      <div class="more-row" onclick="closeMore(); newSess()">
+        <div class="more-row-info">
+          <div class="more-row-label">New session</div>
+          <div class="more-row-sub">clear and start fresh</div>
+        </div>
+        <span class="more-chev">→</span>
+      </div>
+      <div class="more-row" onclick="closeMore(); initReviewMode()">
+        <div class="more-row-info">
+          <div class="more-row-label">Review</div>
+          <div class="more-row-sub">start a review session</div>
+        </div>
+        <span id="review-btn" class="more-chev">→</span>
+      </div>
+      <div class="more-row" onclick="closeMore(); openFetch()">
+        <div class="more-row-info">
+          <div class="more-row-label">Fetch</div>
+          <div class="more-row-sub">load a file into context</div>
+        </div>
+        <span class="more-chev">→</span>
+      </div>
+      <div class="more-row" onclick="closeMore(); openCfg()">
+        <div class="more-row-info">
+          <div class="more-row-label">Settings</div>
+          <div class="more-row-sub">API keys and config</div>
+        </div>
+        <span class="more-chev">→</span>
+      </div>
+      <div class="more-row more-row-toggle">
+        <div class="more-row-info">
+          <div class="more-row-label">Brief mode</div>
+          <div class="more-row-sub">shorter, condensed responses</div>
+        </div>
+        <button id="brief-btn" class="more-toggle-btn" onclick="toggleBrief()">off</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Fetch overlay -->
 <div class="ov" id="fetch-ov" onclick="ocFetch(event)">
   <div class="sheet">
@@ -228,5 +270,19 @@
 </div>
 
 <script src="miles-archive.js?v=2"></script>
+<script>
+(function(){
+  var c = document.getElementById('stars');
+  for (var i = 0; i < 200; i++) {
+    var s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = (Math.random() * 100) + '%';
+    s.style.top  = (Math.random() * 100) + '%';
+    s.style.animationDelay    = (Math.random() * 6) + 's';
+    s.style.animationDuration = (4 + Math.random() * 5) + 's';
+    c.appendChild(s);
+  }
+})();
+</script>
 </body>
 </html>

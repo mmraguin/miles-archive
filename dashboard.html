@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="miles-archive.css">
 </head>
 <body>
+<div class="constellation" id="stars"></div>
 <div id="dash-app">
 
   <div id="dash-header">
@@ -26,5 +27,19 @@
 </div>
 <script src="miles-archive.js"></script>
 <script>initDash();</script>
+<script>
+(function(){
+  var c = document.getElementById('stars');
+  for (var i = 0; i < 200; i++) {
+    var s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = (Math.random() * 100) + '%';
+    s.style.top  = (Math.random() * 100) + '%';
+    s.style.animationDelay    = (Math.random() * 6) + 's';
+    s.style.animationDuration = (4 + Math.random() * 5) + 's';
+    c.appendChild(s);
+  }
+})();
+</script>
 </body>
 </html>

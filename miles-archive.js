@@ -1038,6 +1038,8 @@ async function initReviewMode() {
   S.reviewMode = true;
   document.getElementById('review-btn').classList.add('on');
   document.getElementById('brief-btn').classList.remove('on');
+  const ri = document.getElementById('review-ind');
+  if (ri) ri.classList.add('on');
   S.brief = false;
 
   setStat('thinking', 'loading review context…');
@@ -1267,8 +1269,30 @@ const BRIEF_RE = [
 function toggleBrief() {
   S.brief = !S.brief;
   document.getElementById('brief-btn').classList.toggle('on', S.brief);
+  syncBriefBtn();
   addSys(S.brief ? 'brief mode on' : 'brief mode off');
 }
+
+function syncBriefBtn() {
+  const btn = document.getElementById('brief-btn');
+  if (btn) btn.textContent = S.brief ? 'on' : 'off';
+}
+
+function fmtDisplayDate(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+// ── More overlay ──────────────────────────────────────────────────────────────
+function openMore()  { document.getElementById('more-ov').classList.add('show'); }
+function closeMore() { document.getElementById('more-ov').classList.remove('show'); }
+function ocMore(e)   { if (e.target === document.getElementById('more-ov')) closeMore(); }
 
 // ── Entry + state extraction ──────────────────────────────────────────────────
 function extractEntry(txt) {
@@ -1955,6 +1979,7 @@ async function sendMsg() {
   if (!S.brief && BRIEF_RE.some(t => t.test(txt))) {
     S.brief = true;
     document.getElementById('brief-btn').classList.add('on');
+    syncBriefBtn();
     addSys('brief mode on');
   }
 
@@ -2116,7 +2141,10 @@ function _clearAndStart() {
   document.getElementById('reflections-bar').classList.remove('show');
   document.getElementById('reflections-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
+  syncBriefBtn();
   document.getElementById('review-btn').classList.remove('on');
+  const ri = document.getElementById('review-ind');
+  if (ri) ri.classList.remove('on');
   document.getElementById('review-bar').classList.remove('show');
   document.getElementById('review-st').className = '';
   document.getElementById('chat').innerHTML = '<div id="chat-empty"><span id="chat-empty-day"></span></div>';
@@ -2141,7 +2169,7 @@ function _initSessionMeta() {
   const sessionDt = new Date(Date.UTC(y, m - 1, d));
   S.sessionDow = dowManila(sessionDt);
   S.sessionDay = dayIndexManila(sessionDt);
-  document.getElementById('wm-date').textContent = S.sessionDate;
+  document.getElementById('wm-date').textContent = fmtDisplayDate(S.sessionDate);
   const emptyDay = document.getElementById('chat-empty-day');
   if (emptyDay) emptyDay.textContent = S.sessionDow;
 }
@@ -2473,7 +2501,8 @@ function restoreDraft(draft) {
   S.sessionDate = draft.date || S.sessionDate;
   S.brief       = draft.brief || false;
   document.getElementById('brief-btn').classList.toggle('on', S.brief);
-  document.getElementById('wm-date').textContent = S.sessionDate;
+  syncBriefBtn();
+  document.getElementById('wm-date').textContent = fmtDisplayDate(S.sessionDate);
   document.getElementById('chat').innerHTML = '';
 
   // Show only last 3 exchanges for clean restore, collapse earlier
@@ -2619,7 +2648,7 @@ if (document.getElementById('app')) {
 
 function initDash() {
   const wmDate = document.getElementById('wm-date');
-  if (wmDate) wmDate.textContent = todayManila();
+  if (wmDate) wmDate.textContent = fmtDisplayDate(todayManila());
   if (!credsReady()) { window.location.href = 'index.html'; return; }
   loadDash();
 }
