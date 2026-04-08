@@ -1040,7 +1040,7 @@ body::before {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -1052,17 +1052,17 @@ body::before {
   border: 1px solid rgba(232,232,232,0.1);
   padding: 32px 28px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: fadeIn 0.8s ease-out both;
 }
-.dash-section:nth-child(1)  { animation-delay: 0.05s; }
-.dash-section:nth-child(2)  { animation-delay: 0.12s; }
-.dash-section:nth-child(3)  { animation-delay: 0.19s; }
-.dash-section:nth-child(4)  { animation-delay: 0.26s; }
-.dash-section:nth-child(5)  { animation-delay: 0.33s; }
-.dash-section:nth-child(6)  { animation-delay: 0.40s; }
-.dash-section:nth-child(7)  { animation-delay: 0.47s; }
-.dash-section:nth-child(8)  { animation-delay: 0.54s; }
-.dash-section:nth-child(n+9){ animation-delay: 0.60s; }
+.dash-section:nth-child(1)  { animation-delay: 0.00s; }
+.dash-section:nth-child(2)  { animation-delay: 0.07s; }
+.dash-section:nth-child(3)  { animation-delay: 0.14s; }
+.dash-section:nth-child(4)  { animation-delay: 0.21s; }
+.dash-section:nth-child(5)  { animation-delay: 0.28s; }
+.dash-section:nth-child(6)  { animation-delay: 0.35s; }
+.dash-section:nth-child(7)  { animation-delay: 0.42s; }
+.dash-section:nth-child(8)  { animation-delay: 0.49s; }
+.dash-section:nth-child(n+9){ animation-delay: 0.56s; }
 
 .dash-section-label {
   font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 400;
