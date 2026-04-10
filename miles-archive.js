@@ -859,8 +859,9 @@ async function triggerPostEntryReview() {
     const rawPatterns = extractPatterns(reply);
     if (rawPatterns && !S.pendingPatterns && !S._queuedPatterns) {
       const merged = mergePatternsUpdate(S.patterns || '', rawPatterns);
-      if (!document.getElementById('pat-bar').classList.contains('show')) {
-        showPatBar(merged);
+      if (!document.getElementById('notes-bar').classList.contains('show')) {
+        S.pendingPatterns = merged;
+        showNotesBar();
       }
     }
     S._reviewFired = true;
@@ -1486,7 +1487,7 @@ async function saveEntry() {
     setTimeout(() => {
       document.getElementById('save-bar').classList.remove('show');
       document.getElementById('save-st').className = '';
-      advanceCascade();
+      showNotesBar();
     }, 2400);
   } catch(err) {
     setSaveSt('err', friendlyError(err));
@@ -1498,7 +1499,7 @@ function dismissSave() {
   S.pendingEntry = null; S.pendingPath = null;
   document.getElementById('save-bar').classList.remove('show');
   document.getElementById('save-st').className = '';
-  advanceCascade();
+  showNotesBar();
 }
 
 // ── State doc save ────────────────────────────────────────────────────────────
@@ -1673,7 +1674,7 @@ async function saveInsights() {
   }
 }
 
-// ── Threads auto-save (no bar — fires silently after insights saves or dismisses) ──
+// ── Threads auto-save (silent, called from saveAllNotes) ──────────────────────
 async function saveThreads() {
   if (!S._pendingThreads) return;
   const content = S._pendingThreads;
@@ -1686,6 +1687,123 @@ async function saveThreads() {
   } catch(err) {
     addSys(`threads save failed: ${friendlyError(err)}`);
   }
+}
+
+// ── Notes save-all bar ────────────────────────────────────────────────────────
+function showNotesBar() {
+  // Flush any queued items into pending
+  if (S._queuedPatterns)     { S.pendingPatterns     = S._queuedPatterns;     S._queuedPatterns     = null; }
+  if (S._queuedGoalsSummary) { S.pendingGoalsSummary = S._queuedGoalsSummary; S._queuedGoalsSummary = null; }
+  if (S._queuedInsights)     { S.pendingInsights     = S._queuedInsights;     S._queuedInsights     = null; }
+  if (S._queuedPeople)       { S.pendingPeople       = S._queuedPeople;       S._queuedPeople       = null; }
+  if (S._queuedPeopleNotes)  { S.pendingPeopleNotes  = S._queuedPeopleNotes;  S._queuedPeopleNotes  = null; }
+  if (S._queuedEvolution)    { S.pendingEvolution    = S._queuedEvolution;    S._queuedEvolution    = null; }
+  if (S._queuedReflections)  { S.pendingReflections  = S._queuedReflections;  S._queuedReflections  = null; }
+
+  const files = [
+    S.pendingPatterns     && 'patterns',
+    S.pendingGoalsSummary && 'goals-summary',
+    S.pendingInsights     && 'insights',
+    S._pendingThreads     && 'threads',
+    S.pendingPeople       && 'people profile',
+    S.pendingPeopleNotes  && 'people notes',
+    S.pendingEvolution    && 'evolution',
+    S.pendingReflections  && 'reflections',
+  ].filter(Boolean);
+
+  if (!files.length) return;
+
+  document.getElementById('notes-files').textContent = files.join(' · ');
+  document.getElementById('notes-go').disabled = false;
+  document.getElementById('notes-st').className = '';
+  document.getElementById('notes-bar').classList.add('show');
+}
+
+async function saveAllNotes() {
+  const btn = document.getElementById('notes-go');
+  btn.disabled = true;
+  const st = document.getElementById('notes-st');
+  st.className = 'show info'; st.textContent = 'writing…';
+
+  const tasks = [];
+
+  if (S.pendingPatterns) {
+    const c = S.pendingPatterns; S.pendingPatterns = null;
+    tasks.push(githubPut('notes/patterns.md', c, 'patterns: update notes/patterns.md')
+      .then(() => { S.patterns = c; S._cachedSysPrompt = null; addSys('patterns updated → notes/patterns.md'); })
+      .catch(e => addSys(`patterns save failed: ${friendlyError(e)}`)));
+  }
+  if (S.pendingGoalsSummary) {
+    const c = S.pendingGoalsSummary; S.pendingGoalsSummary = null;
+    tasks.push(githubPut('notes/goals-summary.md', c, 'goals-summary: update notes/goals-summary.md')
+      .then(() => { S.goals = c; S._cachedSysPrompt = null; addSys('goals summary updated → notes/goals-summary.md'); })
+      .catch(e => addSys(`goals-summary save failed: ${friendlyError(e)}`)));
+  }
+  if (S.pendingInsights) {
+    const c = S.pendingInsights; S.pendingInsights = null;
+    tasks.push(githubPut('notes/chat-insights.md', c, 'insights: update notes/chat-insights.md')
+      .then(() => { S.chatInsights = c; S._cachedSysPrompt = null; addSys('insights updated → notes/chat-insights.md'); })
+      .catch(e => addSys(`insights save failed: ${friendlyError(e)}`)));
+  }
+  if (S._pendingThreads) {
+    const c = S._pendingThreads; S._pendingThreads = null;
+    tasks.push(githubPut('notes/threads.md', c, 'threads: update notes/threads.md')
+      .then(() => { S.threads = c; S._cachedSysPrompt = null; addSys('threads updated → notes/threads.md'); })
+      .catch(e => addSys(`threads save failed: ${friendlyError(e)}`)));
+  }
+  if (S.pendingPeople) {
+    const c = S.pendingPeople; S.pendingPeople = null;
+    tasks.push(githubPut('notes/people-profile.md', c, 'people: update notes/people-profile.md')
+      .then(() => { S.peopleProfile = c; addSys('people profile updated → notes/people-profile.md'); })
+      .catch(e => addSys(`people profile save failed: ${friendlyError(e)}`)));
+  }
+  if (S.pendingPeopleNotes) {
+    const c = S.pendingPeopleNotes; S.pendingPeopleNotes = null;
+    tasks.push(githubPut('notes/people-notes.md', c, 'people-notes: update notes/people-notes.md')
+      .then(() => { S.peopleNotes = c; addSys('people notes updated → notes/people-notes.md'); })
+      .catch(e => addSys(`people notes save failed: ${friendlyError(e)}`)));
+  }
+  if (S.pendingEvolution) {
+    const c = S.pendingEvolution; S.pendingEvolution = null;
+    tasks.push(githubPut('notes/evolution.md', c, 'evolution: update notes/evolution.md')
+      .then(() => {
+        S.evolution = c; S.evoTrigger = false;
+        try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {}
+        addSys('evolution updated → notes/evolution.md');
+      })
+      .catch(e => addSys(`evolution save failed: ${friendlyError(e)}`)));
+  }
+  if (S.pendingReflections) {
+    const c = S.pendingReflections; S.pendingReflections = null;
+    tasks.push(getFileInfo('notes/reflections.md')
+      .then(({ sha, content: existing }) => {
+        const merged = mergeReflectionsUpdate(existing, c);
+        return githubPut('notes/reflections.md', merged, 'reflections: update notes/reflections.md', sha)
+          .then(() => { S.reflections = merged; addSys('reflections updated → notes/reflections.md'); });
+      })
+      .catch(e => addSys(`reflections save failed: ${friendlyError(e)}`)));
+  }
+
+  await Promise.all(tasks);
+
+  st.className = 'show ok'; st.textContent = 'saved';
+  setTimeout(() => {
+    document.getElementById('notes-bar').classList.remove('show');
+    st.className = '';
+  }, 2400);
+}
+
+function dismissAllNotes() {
+  S.pendingPatterns = null;     S._queuedPatterns     = null;
+  S.pendingGoalsSummary = null; S._queuedGoalsSummary = null;
+  S.pendingInsights = null;     S._queuedInsights     = null;
+  S._pendingThreads = null;
+  S.pendingPeople = null;       S._queuedPeople       = null;
+  S.pendingPeopleNotes = null;  S._queuedPeopleNotes  = null;
+  S.pendingEvolution = null;    S._queuedEvolution    = null;
+  S.pendingReflections = null;  S._queuedReflections  = null;
+  document.getElementById('notes-bar').classList.remove('show');
+  document.getElementById('notes-st').className = '';
 }
 
 // ── People profile save ───────────────────────────────────────────────────────
@@ -1789,7 +1907,7 @@ function dismissReview() {
   S.pendingReview = null;
   document.getElementById('review-bar').classList.remove('show');
   document.getElementById('review-st').className = '';
-  advanceCascade();
+  showNotesBar();
 }
 
 async function saveReview() {
@@ -1808,7 +1926,7 @@ async function saveReview() {
     setTimeout(() => {
       document.getElementById('review-bar').classList.remove('show');
       document.getElementById('review-st').className = '';
-      advanceCascade();
+      showNotesBar();
     }, 2400);
   } catch(err) {
     setReviewSt('err', friendlyError(err));
@@ -2058,41 +2176,18 @@ async function sendMsg() {
     const firstBar = S.reviewMode ? review : entry;
     // Queue order (daily):  entry → patterns → goals-summary → insights → people → people-notes → evolution → reflections
     // Queue order (review): review → goals-summary → people-notes → people-profile
-    // threads auto-saves silently after insights bar confirms or dismisses — no bar in cascade
-    if (threads) S._pendingThreads = threads;
-    if (patterns) {
-      if (firstBar) S._queuedPatterns = patterns;
-      else showPatBar(patterns);
-    }
-    if (goalsSummary) {
-      if (firstBar || patterns) S._queuedGoalsSummary = goalsSummary;
-      else showGoalsSummaryBar(goalsSummary);
-    }
-    if (insights) {
-      if (firstBar || patterns || goalsSummary) S._queuedInsights = insights;
-      else showInsightsBar(insights);
-    }
-    if (people) {
-      if (firstBar || patterns || goalsSummary || insights) S._queuedPeople = people;
-      else showPeopleBar(people);
-    }
-    if (peopleNotes) {
-      if (firstBar || patterns || goalsSummary || insights || people) S._queuedPeopleNotes = peopleNotes;
-      else showPeopleNotesBar(peopleNotes);
-    }
-    if (evolution) {
-      if (firstBar || patterns || goalsSummary || insights || people || peopleNotes) S._queuedEvolution = evolution;
-      else showEvoBar(evolution);
-    }
-    if (reflections) {
-      if (firstBar || patterns || goalsSummary || insights || people || peopleNotes || evolution) {
-        S._queuedReflections = reflections;
-      } else {
-        showReflectionsBar(reflections);
-      }
-    }
+    // Queue notes if an entry/review bar is first; otherwise set pending and show immediately
+    if (threads)      S._pendingThreads     = threads;
+    if (patterns)     { if (firstBar) S._queuedPatterns     = patterns;     else S.pendingPatterns     = patterns; }
+    if (goalsSummary) { if (firstBar) S._queuedGoalsSummary = goalsSummary; else S.pendingGoalsSummary = goalsSummary; }
+    if (insights)     { if (firstBar) S._queuedInsights     = insights;     else S.pendingInsights     = insights; }
+    if (people)       { if (firstBar) S._queuedPeople       = people;       else S.pendingPeople       = people; }
+    if (peopleNotes)  { if (firstBar) S._queuedPeopleNotes  = peopleNotes;  else S.pendingPeopleNotes  = peopleNotes; }
+    if (evolution)    { if (firstBar) S._queuedEvolution    = evolution;    else S.pendingEvolution    = evolution; }
+    if (reflections)  { if (firstBar) S._queuedReflections  = reflections;  else S.pendingReflections  = reflections; }
     if (review) showReviewBar(review);
     else if (entry) showSaveBar(entry, detectType(reply));
+    if (!firstBar) showNotesBar();
     setStat('ready', S.reviewMode ? `review — ${S.sessionDate}` : `ready — ${S.sessionDate}`);
     // Trigger deep context fetch in background if signaled
     if (deepFetch && !S.deepFetched) {
@@ -2140,6 +2235,7 @@ function _clearAndStart() {
   S.reflections = null; S.pendingReflections = null; S._queuedReflections = null;
   S.reviewMode = false; S.pendingReview = null; S.existingReview = null; S.reviewLog = null;
   S._reviewFired = false; S._reviewRunning = false; S._deepContext = null; S._cachedSysPrompt = null;
+  S._pendingThreads = null;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
   document.getElementById('goals-summary-bar').classList.remove('show');
@@ -2156,6 +2252,8 @@ function _clearAndStart() {
   document.getElementById('evo-st').className = '';
   document.getElementById('reflections-bar').classList.remove('show');
   document.getElementById('reflections-st').className = '';
+  document.getElementById('notes-bar').classList.remove('show');
+  document.getElementById('notes-st').className = '';
   document.getElementById('brief-btn').classList.remove('on');
   syncBriefBtn();
   document.getElementById('review-btn').classList.remove('on');

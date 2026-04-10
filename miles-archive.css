@@ -592,6 +592,44 @@ body::before {
 #state-st.info { color: var(--text-2); }
 
 /* ── Save bar ── */
+#notes-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#notes-bar.show { display: flex; }
+
+#notes-top  { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#notes-lbl  { font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 500; color: var(--teal); flex-shrink: 0; }
+#notes-files { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#notes-row  { display: flex; align-items: center; gap: 14px; }
+
+#notes-go {
+  background: none; border: 1px solid var(--teal); cursor: pointer;
+  font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 500;
+  color: var(--teal); padding: 9px 22px; border-radius: 0;
+  transition: opacity 0.18s; line-height: 1;
+}
+#notes-go:hover    { opacity: 0.82; }
+#notes-go:disabled { opacity: 0.2; cursor: not-allowed; }
+
+#notes-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: color 0.18s;
+}
+#notes-no:hover { color: var(--text-2); }
+
+#notes-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#notes-st.show { display: block; }
+#notes-st.ok   { color: var(--success); }
+#notes-st.err  { color: var(--error); }
+#notes-st.info { color: var(--text-2); }
+
 #save-bar {
   display: none; flex-direction: column; gap: 10px;
   padding: 14px 16px 16px;
@@ -1288,7 +1326,7 @@ body::before {
 /* All save / action bars: glass treatment */
 #pat-bar, #goals-summary-bar, #insights-bar, #state-bar,
 #people-bar, #people-notes-bar, #evo-bar, #reflections-bar,
-#review-bar, #save-bar {
+#review-bar, #notes-bar, #save-bar {
   background: rgba(10,10,10,0.88) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1298,7 +1336,7 @@ body::before {
 /* Save bar labels → Space Mono */
 #pat-lbl, #goals-summary-lbl, #insights-lbl, #state-lbl,
 #people-lbl, #people-notes-lbl, #evo-lbl, #reflections-lbl,
-#review-lbl, #save-lbl {
+#review-lbl, #notes-lbl, #save-lbl {
   font-family: 'Space Mono', monospace;
   font-size: 9px;
   font-weight: 700;
@@ -1309,7 +1347,7 @@ body::before {
 /* Save bar path labels → Space Mono */
 #pat-path, #goals-summary-path, #insights-path, #state-path,
 #people-path, #people-notes-path, #evo-path, #reflections-path,
-#review-path, #save-path {
+#review-path, #notes-files, #save-path {
   font-family: 'Space Mono', monospace;
   font-size: 8px;
   opacity: 0.5;
@@ -1318,7 +1356,7 @@ body::before {
 /* Save bar confirm buttons → Space Mono */
 #pat-go, #goals-summary-go, #insights-go, #state-go,
 #people-go, #people-notes-go, #evo-go, #reflections-go,
-#review-go, #save-go {
+#review-go, #notes-go, #save-go {
   font-family: 'Space Mono', monospace !important;
   font-size: 8px !important;
   font-weight: 700 !important;
@@ -1329,7 +1367,7 @@ body::before {
 /* Save bar dismiss buttons → Space Mono */
 #pat-no, #goals-summary-no, #insights-no, #state-no,
 #people-no, #people-notes-no, #evo-no, #reflections-no,
-#review-no, #save-no {
+#review-no, #notes-no, #save-no {
   font-family: 'Space Mono', monospace;
   font-size: 8px;
   letter-spacing: 1px;
