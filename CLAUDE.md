@@ -1,6 +1,6 @@
 # miles-archive — Claude Code Reference
 
-*Last updated: 2026-04-07*
+*Last updated: 2026-04-13*
 
 → Project overview and self-hosting: [README.md](README.md)
 → Feature status and planned work: [ROADMAP.md](ROADMAP.md)
@@ -73,10 +73,23 @@ Non-obvious notes:
 - `evolutionUpdate` only injected when 90+ days since last entry (or none exists) and 7+ days since last offered
 - `threadsUpdate` outputs `<<<THREADS_START>>>` / `<<<THREADS_END>>>` markers; threads.md is auto-saved silently after insights bar confirms — no separate save bar
 
-**File distinctions (patterns vs. chat-insights):**
-- `patterns.md` = what the *data* shows — behavioral/health correlations confirmed across journal entries and Garmin data. Answers: *what does the record show?*
-- `chat-insights.md` = what *conversations* added — mechanisms explained, reframes that shifted something, patterns named in a way that landed differently. Answers: *what did the chat surface that the journal alone didn't?*
-- `threads.md` = consolidated return list derived from both; tagged `[pattern]` or `[insight]`; retrieved cheaply as a single file
+**File distinctions:**
+- `patterns.md` = what the *data* shows — behavioral/health correlations confirmed across journal entries and Garmin data. Answers: *what does the record show?* Sections: HEALTH, BEHAVIORAL, EMOTIONAL only. No GOALS section — goal status tracking belongs in `goals-summary.md`.
+- `chat-insights.md` = what *conversations* added — mechanisms explained, reframes that shifted something, distinctions named in a way that landed differently. Answers: *what did the chat surface that the journal alone didn't?* Entry test: if you remove the interface's contribution and the entry still reads like a journal summary, it does not belong here. Entry structure: `**Date surfaced** / **Source context** / ### What the interface surfaced / ### Why this matters / ### Suggested follow-up`. Newest entries first within each thematic section.
+- `threads.md` = operational pointer index, not a knowledge note. No interpretation — source link carries the context. Three sections: Open (has `next_step` + `owner`), Watch (has `next_check`, no action confirmed), Closed (has `resolution`). Entries newest-first within Open. Tagged `[pattern]` or `[insight]`; auto-saved silently after insights bar confirms.
+
+**Operating rule:** Capture once. Summarize once. Reference elsewhere. Do not re-explain the same detail across multiple files. The biggest source of system clutter is over-promotion: one meaningful moment turning into a reflection, an insight, a pattern, a people note, and a thread simultaneously.
+
+**Promotion criteria — write to a file only if the detail qualifies:**
+- → `reflections`: one of the day's most worth-remembering moments
+- → `chat-insights`: the interface added understanding not already explicit in the journal; entry test must pass
+- → `patterns`: repeated enough, or high enough impact, to warrant ongoing attention
+- → `state-of-miles`: medically current and data-backed; narrative-only mentions do not qualify
+- → `people-profile`: person is recurring enough to deserve a stable entry
+- → `goals-summary`: reflects active goal state
+- → `evolution`: phase-level shift only; do not generate unless 90+ days since last entry
+- → `threads`: unresolved cross-note item; source note holds the meaning, not the thread entry
+- → `people-notes`: major relationship with evolving arc; most people should be profile-only
 
 ---
 

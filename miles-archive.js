@@ -426,6 +426,9 @@ Avoid:
 
 Write short when the moment calls for it. Don't soften clinical observations — name them. Emojis occasionally when they land something better than words — not as filler.`;
 
+  // ── Section: Write-instruction preamble
+  const writePreamble = `NOTE UPDATE DEFAULT: silence. Do not emit any note block unless its stated threshold is unambiguously met. A weak match, a passing mention, or an uncertain case is not enough — omit the block entirely. Every section below has its own trigger rule; this default overrides any ambiguity.`;
+
   // ── Section: State doc update instructions
   const stateUpdate = `STATE DOC UPDATES
 When something clinically significant comes up in conversation — a medication change, new lab result, diagnosis update, a new open thread, or something that closes — you can generate an updated state-of-miles.md and offer to save it.
@@ -448,8 +451,10 @@ Date format: use [[YYYY-MM-DD]] wikilink format for all specific dates in the do
 The markers will be stripped from the chat display — Miles will see a save bar for the state doc, separate from the journal entry save.`;
 
   // ── Section: Chat insights update instructions
-  const chatInsightsUpdate = `CHAT INSIGHTS UPDATES
-chat-insights.md captures what conversations added that wasn't already in the data — mechanisms explained, reframes that shifted something, patterns named in a way that landed differently. It does NOT contain ongoing data flags, clinical tracking, or behavioral patterns from the journal record (those belong in patterns.md). If this session surfaced a genuine insight of this kind, output the complete updated notes/chat-insights.md wrapped in markers.
+  const chatInsightsUpdate = S.brief ? '' : `CHAT INSIGHTS UPDATES
+chat-insights.md captures what conversations added that wasn't already in the data — mechanisms explained, reframes that shifted something, distinctions named in a way that landed differently. It does NOT contain behavioral patterns from the journal record (those belong in patterns.md), clinical tracking (state-of-miles.md), or session summaries.
+
+ENTRY TEST: Before writing an entry, ask: if you remove the interface's contribution, does it still read like a journal summary? If yes, it does not belong here. The entry must record what the conversation added, not what happened.
 
 EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "take note", "remember this", "add this to insights", "log this", or otherwise directly asks you to record something — treat this as an unambiguous instruction to record. Include the markers in your response in addition to your conversational reply, not instead of it.
 
@@ -464,10 +469,17 @@ EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "tak
 
 ## Section Name
 
-**[[${date}]]**
-Narrative observation in paragraph form.
+**Date surfaced:** [[${date}]]
+**Source context:** [brief description of what was happening in the conversation]
 
-*Watch: something flagged for follow-up.*
+### What the interface surfaced
+[mechanism explained, reframe named, distinction that landed differently — what the conversation added that the journal alone didn't]
+
+### Why this matters
+[what changes about how Miles understands herself or her situation]
+
+### Suggested follow-up
+- [specific action, question for therapy, or thing to track]
 
 ---
 <<<CHAT_INSIGHTS_END>>>
@@ -475,12 +487,11 @@ Narrative observation in paragraph form.
 Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the document.
 
 Rules:
-- Prepend new entries at the top of the correct existing section (newest first); create a new ## Section if none fit
+- Prepend new entries at the top of the correct existing section (newest first within each section); create a new ## Section if none fit
 - Preserve all prior entries verbatim
 - Inline cross-references within entry text use [[#Section Name|label]] format
-- When a Watch note has resolved, update that entry to note the outcome
-- UPDATE when: a mechanism is explained, a reframe shifts something, a named experience surfaces that the data alone didn't surface
-- DO NOT update: for behavioral patterns confirmed across journal entries (those go in patterns.md), for clinical flags (state-of-miles.md), for passing comments, for things already captured`;
+- UPDATE when: a mechanism is explained, a reframe shifts something, a named experience surfaces that the data alone didn't surface — and only when the entry test passes
+- DO NOT update: for behavioral patterns confirmed across journal entries (those go in patterns.md), for clinical flags (state-of-miles.md), for passing comments, for session summaries, for things already captured`;
 
   // ── Section: People notes context (not injected in brief mode)
   const peopleNotesContext = (!S.brief && S.peopleNotes)
@@ -493,8 +504,8 @@ Rules:
     : '';
 
   // ── Section: People profile update instructions
-  const peopleUpdate = `PEOPLE PROFILE UPDATES
-After the journal entry, if any named person was mentioned this session, output the complete updated people profile:
+  const peopleUpdate = S.brief ? '' : `PEOPLE PROFILE UPDATES
+After the journal entry, emit this only if a named person's profile entry actually changed — new person appearing for the first time, sessions_mentioned incrementing, notes updating, or relationship needing correction. Do not emit just because someone was mentioned. A passing reference that adds nothing new to the record does not qualify.
 
 <<<PEOPLE_START>>>
 ---
@@ -502,24 +513,27 @@ last_updated: ${date}
 ---
 people:
   - name: [Name]
-    relationship: [friend/family/partner/colleague/doctor/therapist/other]
-    type: [regular/medical/professional]
+    relationship: [description — who they are to Miles]
+    type: [regular/medical/professional/pet]
+    first_mentioned: "YYYY-MM-DD"
+    last_mentioned: "${date}"
     sessions_mentioned: [N]
-    last_mentioned: ${date}
-    themes: [theme1, theme2]
+    notes: "[optional — factual context only: aliases, key facts, recurring role. Not relationship analysis.]"
 <<<PEOPLE_END>>>
 
 Rules:
 - sessions_mentioned: total count of sessions this person has appeared in — increment by 1 for current session if mentioned today
-- type: medical for doctors/therapists/clinical, professional for work contacts, regular for everyone else
+- type: medical for doctors/therapists/clinical, professional for work contacts, pet for animals, regular for everyone else
+- first_mentioned: set once on creation, never update
+- notes: factual and neutral — aliases, key facts, recurring context. Do not include relationship analysis or anything that belongs in people-notes. Omit the field entirely if there is nothing factual to record.
 - Before creating a new entry, check if the name matches an existing one — merge variations (nickname, surname), never duplicate
-- Update relationship or themes if context changed this session
 - Output the full file preserving all existing entries
-- Only emit if at least one named person was mentioned today`;
+- Only emit if something in the profile actually changed — a new person, a new session count, a notes update, or a relationship correction. Not for routine mentions.
+- Output only the fields in the template above — do not add other fields`;
 
   // ── Section: Threads update instructions
   const threadsUpdate = `THREADS UPDATE
-notes/threads.md is the consolidated return list — tagged [pattern] (data-derived, detail in patterns.md) or [insight] (conversation-derived, detail in chat-insights.md). Three sections: Watch (passive monitoring from chat-insights *Watch:* items), Open (active inquiry), Closed (resolved). Update it when a thread opens, closes, changes status, or a new Watch item appears in chat-insights. Output the complete updated file wrapped in markers — it will be auto-saved silently.
+notes/threads.md is the operational pointer index — tagged [pattern] (data-derived, detail in patterns.md) or [insight] (conversation-derived, detail in chat-insights.md). Three sections: Open (active inquiry, newest first), Watch (passive monitoring), Closed (resolved). No interpretation goes here — source notes carry the context. Update it when a thread opens, closes, changes status, or a new Watch item appears in chat-insights. Output the complete updated file wrapped in markers — it will be auto-saved silently.
 
 <<<THREADS_START>>>
 ---
@@ -529,42 +543,57 @@ last_updated: [[${date}]]
 
 # Return Threads
 
-*Last updated: [[${date}]]*
-
-*Consolidated threads from patterns (data-derived, \`[pattern]\`) and chat-insights (conversation-derived, \`[insight]\`). Watch = passive monitoring; Open = active inquiry; Closed = resolved.*
+*Operational index of unresolved items across notes. No interpretation here — follow the source link for full context.*
 
 ---
 
 ## Open
 
-- \`[pattern]\` **Thread name** — brief description — *first: [[YYYY-MM-DD]]*
-- \`[insight]\` **Thread name** — brief description — *[[YYYY-MM-DD]]*
+- **Thread name** \`[insight]\`
+  - source: \`chat-insights > Section Name\`
+  - first_opened: [[YYYY-MM-DD]]
+  - next_step: [specific action]
+  - owner: self-review/therapy/medical/self-admin
 
 ---
 
 ## Watch
 
-- \`[insight]\` **Thread name** — brief description — *[[YYYY-MM-DD]]*
+- **Thread name** \`[insight]\`
+  - source: \`chat-insights > Section Name\`
+  - first_opened: [[YYYY-MM-DD]]
+  - next_check: [condition or date triggering promotion to Open]
+  - owner: self-review
 
 ---
 
 ## Closed
 
-- \`[pattern]\` **Thread name** — outcome — *closed: [[YYYY-MM-DD]]*
+- **Thread name** \`[pattern]\`
+  - source: \`patterns > Section Name\`
+  - first_opened: [[YYYY-MM-DD]]
+  - closed: [[${date}]]
+  - resolution: [brief outcome]
 <<<THREADS_END>>>
 
 Rules:
-- Preserve all existing threads; update status when something resolves
-- Move resolved threads to Closed with a brief outcome note
-- Add new threads when a pattern opens or an insight surfaces that warrants active inquiry
-- Scan CHAT INSIGHTS for \`*Watch:\` items; if any are not already in the Watch section, add them as \`[insight]\` entries
-- When a Watch item resolves, move it to Closed with a brief outcome note
-- Keep labels short — one line per thread
-- UPDATE when: a thread opens, closes, its description needs correcting, or a new Watch item appears in chat-insights. DO NOT update every session.`;
+- Preserve all existing threads verbatim; update only the entries that changed this session
+- Open: newest entries first; each entry has source, first_opened, next_step, owner
+- Watch: each entry has source, first_opened, next_check, owner — no confirmed action yet
+- Closed: each entry has source, first_opened, closed date, resolution
+- Move resolved Open threads to Closed; move Watch items to Open when action is confirmed
+- New Open thread: when a pattern or insight surfaces that is genuinely unresolved and needs tracking
+- New Watch item: when a Suggested follow-up item in chat-insights is not yet actionable
+- Source must point to the actual section where the detail lives — that note carries the meaning, not this entry
+- UPDATE when: a thread opens, closes, changes status, or a Watch item appears. DO NOT update every session.`;
 
   // ── Section: People notes update instructions (suppressed in brief mode)
   const peopleNotesUpdate = S.brief ? '' : `PEOPLE NOTES UPDATES
-When a named person has a notable moment this session — not every routine mention, but something that shifts the relationship, reveals a pattern, or is worth remembering — output the complete updated notes/people-notes.md:
+When a named person has a notable moment this session — not every routine mention, but something that shifts the relationship, reveals a pattern, or is worth remembering — output the complete updated notes/people-notes.md.
+
+THRESHOLD: Only create a new entry for someone who is recurring AND emotionally or practically significant — someone whose relationship arc has evolving meaning. One-off appearances and peripheral people belong in the profile only. Most people mentioned should NOT get a narrative here.
+
+NEGATIVE RULE: Do not create or expand an entry because someone had a notable moment. The bar is new relationship meaning — a shift in dynamic, a revelation about how the relationship works, or the beginning of an arc that will need tracking over time. A touching moment, a good conversation, or a meaningful mention does not clear this bar on its own.
 
 <<<PEOPLE_NOTES_START>>>
 ---
@@ -581,8 +610,9 @@ last_updated: ${date}
 
 Rules:
 - Notable moments only: a revelation, a shift, a significant exchange — not routine mentions
+- Threshold: recurring + emotionally/practically significant only; do not create entries for peripheral or one-off people
 - Preserve all prior entries verbatim; update the relevant ## [Name] section if they appeared notably this session
-- Create a new ## [Name] section if this person has no prior entry
+- Create a new ## [Name] section only if this person meets the threshold and has no prior entry
 - Update the Last updated date for any section touched
 - Output the full file with all existing entries
 - Do not emit in brief mode or for passing mentions`;
@@ -670,7 +700,7 @@ Always emit this block after every daily entry — it is not optional.`;
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, threadsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, goalsSummaryUpdate, chatInsightsUpdate, threadsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, threadsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, writePreamble, stateUpdate, goalsSummaryUpdate, chatInsightsUpdate, threadsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -717,12 +747,11 @@ If nothing warrants updating, output exactly: NO_UPDATE
 REFLECTION PATTERNS
 If today's reflection data (gratitude, wins, memory from the session) reveals a theme emerging across sessions, track it:
 - Gratitude repeatedly mentions a person → note relational pattern (## Relationship / [Name] or relevant section)
-- Wins cluster in a goal zone → note momentum (## Actively Working On or ## In Progress)
-- Memory entries share a tone (quiet, connection, achievement) → name the pattern in ## Mood Patterns or ## Completed Milestones
+- Wins cluster in a domain → note momentum in the relevant ## section under BEHAVIORAL or EMOTIONAL
+- Memory entries share a tone (quiet, connection, achievement) → name the pattern in the relevant ## section
 Only add if the theme has appeared 3+ times. Use standard confirmation format.
 
 WHAT TO OUTPUT (changed sections only):
-- Any goal section (Actively Working On / Progressing but Incomplete / Stalled or Not Evidenced / Goal Conflicts) — if a goal moved or stalled
 - Any health, behavioral, or emotional section from the doc — only if today adds a new data point
 
 WHAT NEVER TO OUTPUT:
@@ -1672,9 +1701,9 @@ async function saveAllNotes() {
     S.pendingGoalsSummary && ['notes/goals-summary.md', 'goals-summary: update notes/goals-summary.md', () => S.pendingGoalsSummary, (c) => { S.pendingGoalsSummary = null; S.goals = c;           S._cachedSysPrompt = null; addSys('goals summary updated → notes/goals-summary.md'); }],
     S.pendingInsights     && ['notes/chat-insights.md', 'insights: update notes/chat-insights.md', () => S.pendingInsights,     (c) => { S.pendingInsights = null;     S.chatInsights = c;    S._cachedSysPrompt = null; addSys('insights updated → notes/chat-insights.md'); }],
     S._pendingThreads     && ['notes/threads.md',       'threads: update notes/threads.md',        () => S._pendingThreads,     (c) => { S._pendingThreads = null;     S.threads = c;         S._cachedSysPrompt = null; addSys('threads updated → notes/threads.md'); }],
-    S.pendingPeople       && ['notes/people-profile.md','people: update notes/people-profile.md',  () => S.pendingPeople,       (c) => { S.pendingPeople = null;       S.peopleProfile = c;   addSys('people profile updated → notes/people-profile.md'); }],
-    S.pendingPeopleNotes  && ['notes/people-notes.md',  'people-notes: update notes/people-notes.md', () => S.pendingPeopleNotes,  (c) => { S.pendingPeopleNotes = null;  S.peopleNotes = c;     addSys('people notes updated → notes/people-notes.md'); }],
-    S.pendingEvolution    && ['notes/evolution.md',     'evolution: update notes/evolution.md',    () => S.pendingEvolution,    (c) => { S.pendingEvolution = null;    S.evolution = c; S.evoTrigger = false; try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} addSys('evolution updated → notes/evolution.md'); }],
+    S.pendingPeople       && ['notes/people-profile.md','people: update notes/people-profile.md',  () => S.pendingPeople,       (c) => { S.pendingPeople = null;       S.peopleProfile = c;   S._cachedSysPrompt = null; addSys('people profile updated → notes/people-profile.md'); }],
+    S.pendingPeopleNotes  && ['notes/people-notes.md',  'people-notes: update notes/people-notes.md', () => S.pendingPeopleNotes,  (c) => { S.pendingPeopleNotes = null;  S.peopleNotes = c;     S._cachedSysPrompt = null; addSys('people notes updated → notes/people-notes.md'); }],
+    S.pendingEvolution    && ['notes/evolution.md',     'evolution: update notes/evolution.md',    () => S.pendingEvolution,    (c) => { S.pendingEvolution = null;    S.evolution = c; S.evoTrigger = false; S._cachedSysPrompt = null; try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} addSys('evolution updated → notes/evolution.md'); }],
   ].filter(Boolean);
 
   const failed = [];
