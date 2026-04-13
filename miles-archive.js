@@ -447,76 +447,11 @@ Date format: use [[YYYY-MM-DD]] wikilink format for all specific dates in the do
 
 The markers will be stripped from the chat display — Miles will see a save bar for the state doc, separate from the journal entry save.`;
 
-  // ── Section: Patterns doc update instructions
-  const patternsUpdate = `PATTERNS DOC UPDATES
-After producing the journal entry, if something notable emerged this session, update notes/patterns.md. Output the complete updated doc wrapped in markers:
-
-<<<PATTERNS_START>>>
-# Miles Patterns
-
-*Last updated: [[${date}]]*
-
-${S.patterns
-  ? '[full updated document — preserve all existing sections and structure]'
-  : `**HEALTH**
-
-## Sleep Scores
-## SpO2 / Nocturnal Hypoxia
-## Recovery Scores
-## HRV Patterns
-## Resting Heart Rate
-## Illness Events
-## Heart Rate Recovery
-## Autoimmune / Lab Markers
-
-**BEHAVIORAL**
-
-## Sleep Timing and Duration
-## Physical Activity
-## Habit Tracking
-## Social Response Patterns
-## Medication Adherence
-## Travel Response
-
-**EMOTIONAL**
-
-## Anxiety Triggers
-## Anxiety Relievers
-## Mood Patterns
-## Agoraphobia Manifestations
-## Cognitive Load and Overthinking
-## Relationship / Mik
-## Family Dynamics
-## Therapy
-
-**GOALS**
-
-## Actively Working On
-## Progressing but Incomplete
-## Stalled or Not Evidenced
-## Goal Conflicts`}
-<<<PATTERNS_END>>>
-
-Date format: use [[YYYY-MM-DD]] wikilink format for all dates throughout the document.
-
-Section metadata format:
-- Health/Behavioral sections: *confirmed Nx — First: [[YYYY-MM-DD]] — Last: [[YYYY-MM-DD]]*
-- Behavioral sections add: — direction: improving/stable/worsening
-- Emotional sections: *confirmed across N sessions — Last: [[YYYY-MM-DD]]*
-- Goal sections: *last noted: [[YYYY-MM-DD]]*
-
-UPDATE when: a correlation confirmed 3+ times across different days, a behavioral pattern confirmed 4+ times, an emotional pattern across 3+ session narratives, a goal stagnant 4+ weeks or actively moving. Clinical lab values belong in state-of-miles.md, not here — patterns.md holds the behavioral/functional implications of health data.
-DO NOT update: every session, for single incidents, for things already accurately captured, for wins (those go in reflections.md).
-
-When updating, also clean the doc: mark resolved patterns as resolved, remove Declined entries older than 4 weeks, flag health correlations that predate a recent state doc change as "needs review — health context changed [[date]]." If a pattern's last confirmed date is 8+ weeks ago and hasn't recurred, mark it "needs review — stale."
-
-Causation note: name what the data shows, not what caused it. "Energy tends to be lower the day after drinking" not "alcohol causes energy drops." Observations, not conclusions.`;
-
   // ── Section: Chat insights update instructions
   const chatInsightsUpdate = `CHAT INSIGHTS UPDATES
 chat-insights.md captures what conversations added that wasn't already in the data — mechanisms explained, reframes that shifted something, patterns named in a way that landed differently. It does NOT contain ongoing data flags, clinical tracking, or behavioral patterns from the journal record (those belong in patterns.md). If this session surfaced a genuine insight of this kind, output the complete updated notes/chat-insights.md wrapped in markers.
 
-EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "take note", "remember this", "add this to insights", "log this", or otherwise directly asks you to record something — treat this as an unambiguous instruction to output the markers. Do not respond conversationally and skip the markers. Output the markers.
+EXPLICIT SAVE SIGNAL: If Miles says anything like "note this", "save this", "take note", "remember this", "add this to insights", "log this", or otherwise directly asks you to record something — treat this as an unambiguous instruction to record. Include the markers in your response in addition to your conversational reply, not instead of it.
 
 <<<CHAT_INSIGHTS_START>>>
 # Chat Insights
@@ -714,16 +649,18 @@ Skip if: routine numbers session, Miles is clearly exhausted or in brief mode, n
 After producing the journal entry, always output exactly three lines for notes/reflections.md — one per type:
 
 <<<REFLECTIONS_START>>>
-- [[${date}]] — [[wikilinked person or theme]] #gratitude
-- [[${date}]] — [[wikilinked win or goal zone]] #win
+- [[${date}]] — Brief phrase or sentence with [[people]] or [[themes]] wikilinked inline #gratitude
+- [[${date}]] — Brief phrase or sentence with [[people]] or [[goal zones]] wikilinked inline #win
 - [[${date}]] — One sentence. #memory
 <<<REFLECTIONS_END>>>
 
-Wikilink rules — wrap in [[double brackets]]:
+Wikilink rules — wrap [[named things]] inline within the sentence, not as the whole entry:
 - Named people → [[First Name]] (match people-profile.md names)
 - Goal zones → [[Health]], [[Relationships]], [[Creative Work]], [[Finance]], etc.
 - Recurring themes → [[rest]], [[connection]], [[pain]], [[clarity]], [[small wins]], etc. — infer from context
 - The date is already in the line prefix — do not repeat it inside the content
+- Good: "[[Hannah]] pulling me out of bed" / "Five hours on [[GarageBand]] that actually felt good"
+- Bad: just "[[Hannah]]" or just "[[Health]]" — a wikilink alone is not an entry
 
 The file has three top-level sections (## Gratitude, ## Wins, ## Memory). Each line goes into its matching section, newest at the top.
 Exactly one line per type per session — specificity over quantity.
@@ -733,13 +670,16 @@ Always emit this block after every daily entry — it is not optional.`;
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, threadsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, patternsUpdate, goalsSummaryUpdate, chatInsightsUpdate, threadsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, threadsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, stateUpdate, goalsSummaryUpdate, chatInsightsUpdate, threadsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
 
 function getSysPrompt() {
-  if (!S._cachedSysPrompt) S._cachedSysPrompt = buildSysPrompt();
+  if (!S._cachedSysPrompt) {
+    S._cachedSysPrompt = buildSysPrompt();
+    console.log(`[sys prompt] ${S._cachedSysPrompt.length} chars (~${Math.round(S._cachedSysPrompt.length / 4)} tokens)`);
+  }
   return S._cachedSysPrompt;
 }
 
@@ -822,9 +762,12 @@ function mergePatternsUpdate(currentDoc, updateDoc) {
     const secRe = new RegExp(`^${escRe(header)}(\\n(?!## ).*)*`, 'm');
     if (secRe.test(result)) {
       result = result.replace(secRe, newContent + '\n\n');
-    } else {
+    } else if (/^## Declined/m.test(result)) {
       // New section — insert before ## Declined
       result = result.replace(/^## Declined/m, `${newContent}\n\n---\n\n## Declined`);
+    } else {
+      // No ## Declined section — append at end
+      result = result.trimEnd() + `\n\n---\n\n${newContent}\n`;
     }
   }
   return result;
@@ -840,13 +783,13 @@ async function triggerPostEntryReview() {
   const sessionDate = S.sessionDate;
   S._reviewRunning = true;
 
-  const sessionSummary = S.messages.slice(-20)
-    .map(m => `[${m.role.toUpperCase()}]: ${m.content.slice(0, 800)}`)
-    .join('\n\n');
+  const sessionSummary = S.pendingEntry
+    ? `TODAY'S ENTRY:\n${S.pendingEntry}`
+    : S.messages.slice(-10).map(m => `[${m.role.toUpperCase()}]: ${m.content.slice(0, 400)}`).join('\n\n');
 
   const reviewMessages = [{
     role: 'user',
-    content: `Review this session and update patterns.md if warranted.\n\nSESSION:\n\n${sessionSummary}`,
+    content: `Review today's session and update patterns.md if warranted.\n\n${sessionSummary}`,
   }];
 
   try {
@@ -920,7 +863,7 @@ function buildReviewPrompt(incompleteBlock, goalsCurrent) {
 REVIEW SESSION FLOW
 
 Phase 1 — Opening (first reply only):
-Lead with 2–3 specific observations from patterns and chat insights — what moved, what stalled, what thread keeps showing up. Don't ask for more data, don't recap. Ask ONE targeted question based on what you observed. Close with: "Say 'write it up' when you're ready for the written review."
+Lead with 2–3 specific observations from patterns and chat insights — what moved, what stalled, what thread keeps showing up. Don't ask for more data, don't recap. Ask ONE targeted question based on what you observed.
 
 Phase 2 — Coaching:
 Push back on stalled goals. Celebrate wins by name. Challenge goals that no longer fit. Surface new possibilities if patterns suggest them. After 2–3 turns, if you have enough: "I have what I need — want me to write this up?"
@@ -1723,74 +1666,57 @@ async function saveAllNotes() {
   const btn = document.getElementById('notes-go');
   btn.disabled = true;
   const st = document.getElementById('notes-st');
-  st.className = 'show info'; st.textContent = 'writing…';
 
-  const tasks = [];
+  const saves = [
+    S.pendingPatterns     && ['notes/patterns.md',      'patterns: update notes/patterns.md',      () => S.pendingPatterns,     (c) => { S.pendingPatterns = null;     S.patterns = c;        S._cachedSysPrompt = null; addSys('patterns updated → notes/patterns.md'); }],
+    S.pendingGoalsSummary && ['notes/goals-summary.md', 'goals-summary: update notes/goals-summary.md', () => S.pendingGoalsSummary, (c) => { S.pendingGoalsSummary = null; S.goals = c;           S._cachedSysPrompt = null; addSys('goals summary updated → notes/goals-summary.md'); }],
+    S.pendingInsights     && ['notes/chat-insights.md', 'insights: update notes/chat-insights.md', () => S.pendingInsights,     (c) => { S.pendingInsights = null;     S.chatInsights = c;    S._cachedSysPrompt = null; addSys('insights updated → notes/chat-insights.md'); }],
+    S._pendingThreads     && ['notes/threads.md',       'threads: update notes/threads.md',        () => S._pendingThreads,     (c) => { S._pendingThreads = null;     S.threads = c;         S._cachedSysPrompt = null; addSys('threads updated → notes/threads.md'); }],
+    S.pendingPeople       && ['notes/people-profile.md','people: update notes/people-profile.md',  () => S.pendingPeople,       (c) => { S.pendingPeople = null;       S.peopleProfile = c;   addSys('people profile updated → notes/people-profile.md'); }],
+    S.pendingPeopleNotes  && ['notes/people-notes.md',  'people-notes: update notes/people-notes.md', () => S.pendingPeopleNotes,  (c) => { S.pendingPeopleNotes = null;  S.peopleNotes = c;     addSys('people notes updated → notes/people-notes.md'); }],
+    S.pendingEvolution    && ['notes/evolution.md',     'evolution: update notes/evolution.md',    () => S.pendingEvolution,    (c) => { S.pendingEvolution = null;    S.evolution = c; S.evoTrigger = false; try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} addSys('evolution updated → notes/evolution.md'); }],
+  ].filter(Boolean);
 
-  if (S.pendingPatterns) {
-    const c = S.pendingPatterns; S.pendingPatterns = null;
-    tasks.push(githubPut('notes/patterns.md', c, 'patterns: update notes/patterns.md')
-      .then(() => { S.patterns = c; S._cachedSysPrompt = null; addSys('patterns updated → notes/patterns.md'); })
-      .catch(e => addSys(`patterns save failed: ${friendlyError(e)}`)));
+  const failed = [];
+
+  for (const [path, msg, getContent, onSuccess] of saves) {
+    const c = getContent();
+    st.className = 'show info'; st.textContent = `writing ${path.split('/').pop()}…`;
+    try {
+      await githubPut(path, c, msg);
+      onSuccess(c);
+    } catch(e) {
+      failed.push(path.split('/').pop());
+      addSys(`${path.split('/').pop()} save failed: ${friendlyError(e)}`);
+    }
   }
-  if (S.pendingGoalsSummary) {
-    const c = S.pendingGoalsSummary; S.pendingGoalsSummary = null;
-    tasks.push(githubPut('notes/goals-summary.md', c, 'goals-summary: update notes/goals-summary.md')
-      .then(() => { S.goals = c; S._cachedSysPrompt = null; addSys('goals summary updated → notes/goals-summary.md'); })
-      .catch(e => addSys(`goals-summary save failed: ${friendlyError(e)}`)));
-  }
-  if (S.pendingInsights) {
-    const c = S.pendingInsights; S.pendingInsights = null;
-    tasks.push(githubPut('notes/chat-insights.md', c, 'insights: update notes/chat-insights.md')
-      .then(() => { S.chatInsights = c; S._cachedSysPrompt = null; addSys('insights updated → notes/chat-insights.md'); })
-      .catch(e => addSys(`insights save failed: ${friendlyError(e)}`)));
-  }
-  if (S._pendingThreads) {
-    const c = S._pendingThreads; S._pendingThreads = null;
-    tasks.push(githubPut('notes/threads.md', c, 'threads: update notes/threads.md')
-      .then(() => { S.threads = c; S._cachedSysPrompt = null; addSys('threads updated → notes/threads.md'); })
-      .catch(e => addSys(`threads save failed: ${friendlyError(e)}`)));
-  }
-  if (S.pendingPeople) {
-    const c = S.pendingPeople; S.pendingPeople = null;
-    tasks.push(githubPut('notes/people-profile.md', c, 'people: update notes/people-profile.md')
-      .then(() => { S.peopleProfile = c; addSys('people profile updated → notes/people-profile.md'); })
-      .catch(e => addSys(`people profile save failed: ${friendlyError(e)}`)));
-  }
-  if (S.pendingPeopleNotes) {
-    const c = S.pendingPeopleNotes; S.pendingPeopleNotes = null;
-    tasks.push(githubPut('notes/people-notes.md', c, 'people-notes: update notes/people-notes.md')
-      .then(() => { S.peopleNotes = c; addSys('people notes updated → notes/people-notes.md'); })
-      .catch(e => addSys(`people notes save failed: ${friendlyError(e)}`)));
-  }
-  if (S.pendingEvolution) {
-    const c = S.pendingEvolution; S.pendingEvolution = null;
-    tasks.push(githubPut('notes/evolution.md', c, 'evolution: update notes/evolution.md')
-      .then(() => {
-        S.evolution = c; S.evoTrigger = false;
-        try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {}
-        addSys('evolution updated → notes/evolution.md');
-      })
-      .catch(e => addSys(`evolution save failed: ${friendlyError(e)}`)));
-  }
+
   if (S.pendingReflections) {
-    const c = S.pendingReflections; S.pendingReflections = null;
-    tasks.push(getFileInfo('notes/reflections.md')
-      .then(({ sha, content: existing }) => {
-        const merged = mergeReflectionsUpdate(existing, c);
-        return githubPut('notes/reflections.md', merged, 'reflections: update notes/reflections.md', sha)
-          .then(() => { S.reflections = merged; addSys('reflections updated → notes/reflections.md'); });
-      })
-      .catch(e => addSys(`reflections save failed: ${friendlyError(e)}`)));
+    const c = S.pendingReflections;
+    st.className = 'show info'; st.textContent = 'writing reflections.md…';
+    try {
+      const { sha, content: existing } = await getFileInfo('notes/reflections.md');
+      const merged = mergeReflectionsUpdate(existing, c);
+      await githubPut('notes/reflections.md', merged, 'reflections: update notes/reflections.md', sha);
+      S.pendingReflections = null;
+      S.reflections = merged;
+      addSys('reflections updated → notes/reflections.md');
+    } catch(e) {
+      failed.push('reflections.md');
+      addSys(`reflections save failed: ${friendlyError(e)}`);
+    }
   }
 
-  await Promise.all(tasks);
-
-  st.className = 'show ok'; st.textContent = 'saved';
-  setTimeout(() => {
-    document.getElementById('notes-bar').classList.remove('show');
-    st.className = '';
-  }, 2400);
+  if (failed.length) {
+    st.className = 'show err'; st.textContent = `failed: ${failed.join(', ')} — retry`;
+    btn.disabled = false;
+  } else {
+    st.className = 'show ok'; st.textContent = 'saved';
+    setTimeout(() => {
+      document.getElementById('notes-bar').classList.remove('show');
+      st.className = '';
+    }, 2400);
+  }
 }
 
 function dismissAllNotes() {
@@ -3047,7 +2973,10 @@ async function generateDashInsights(avgs, correlations, patternsContent, people,
     ? correlations.map(c => `- ${c.label}: ${c.delta > 0 ? '+' : ''}${c.delta} (n=${c.n})`).join('\n')
     : 'None detected yet.';
 
-  const patternsExcerpt = patternsContent ? patternsContent.slice(0, 1500) : 'No patterns doc yet.';
+  const truncated = patternsContent?.length > 1500;
+  const patternsExcerpt = patternsContent
+    ? patternsContent.slice(0, 1500) + (truncated ? '\n[patterns doc truncated]' : '')
+    : 'No patterns doc yet.';
   const peopleNames = people.filter(p => p.sessions_mentioned >= 3).map(p => `${p.name} (${p.relationship})`).join(', ') || 'None yet.';
   const goalsLine = goalsSummary ? goalsSummary.trim() : 'Not available.';
 
