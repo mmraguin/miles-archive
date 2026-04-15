@@ -17,6 +17,7 @@
     </div>
     <div id="nav">
       <span id="review-ind" class="nav-review-ind">review</span>
+      <span id="pending-badge" onclick="openPendingQueue()"></span>
       <a class="nav-dash" href="dashboard.html">dash</a>
       <button class="nav-more" onclick="openMore()" aria-label="More">···</button>
     </div>
@@ -39,7 +40,8 @@
     </div>
     <div id="pat-row">
       <button id="pat-go" onclick="savePatterns()">Save to GitHub →</button>
-      <button id="pat-no" onclick="dismissPatterns()">discard</button>
+      <button id="pat-no" onclick="dismissPatterns()">Later</button>
+      <button class="bar-discard" onclick="discardPatterns()">discard</button>
       <span id="pat-st"></span>
     </div>
   </div>
@@ -51,7 +53,8 @@
     </div>
     <div id="goals-summary-row">
       <button id="goals-summary-go" onclick="saveGoalsSummary()">Save to GitHub →</button>
-      <button id="goals-summary-no" onclick="dismissGoalsSummary()">discard</button>
+      <button id="goals-summary-no" onclick="dismissGoalsSummary()">Later</button>
+      <button class="bar-discard" onclick="discardGoalsSummary()">discard</button>
       <span id="goals-summary-st"></span>
     </div>
   </div>
@@ -63,7 +66,8 @@
     </div>
     <div id="insights-row">
       <button id="insights-go" onclick="saveInsights()">Save to GitHub →</button>
-      <button id="insights-no" onclick="dismissInsights()">discard</button>
+      <button id="insights-no" onclick="dismissInsights()">Later</button>
+      <button class="bar-discard" onclick="discardInsights()">discard</button>
       <span id="insights-st"></span>
     </div>
   </div>
@@ -87,7 +91,8 @@
     </div>
     <div id="people-row">
       <button id="people-go" onclick="savePeople()">Save to GitHub →</button>
-      <button id="people-no" onclick="dismissPeople()">discard</button>
+      <button id="people-no" onclick="dismissPeople()">Later</button>
+      <button class="bar-discard" onclick="discardPeople()">discard</button>
       <span id="people-st"></span>
     </div>
   </div>
@@ -99,7 +104,8 @@
     </div>
     <div id="people-notes-row">
       <button id="people-notes-go" onclick="savePeopleNotes()">Save to GitHub →</button>
-      <button id="people-notes-no" onclick="dismissPeopleNotes()">discard</button>
+      <button id="people-notes-no" onclick="dismissPeopleNotes()">Later</button>
+      <button class="bar-discard" onclick="discardPeopleNotes()">discard</button>
       <span id="people-notes-st"></span>
     </div>
   </div>
@@ -111,7 +117,8 @@
     </div>
     <div id="evo-row">
       <button id="evo-go" onclick="saveEvolution()">Save to GitHub →</button>
-      <button id="evo-no" onclick="dismissEvolution()">discard</button>
+      <button id="evo-no" onclick="dismissEvolution()">Later</button>
+      <button class="bar-discard" onclick="discardEvolution()">discard</button>
       <span id="evo-st"></span>
     </div>
   </div>
@@ -123,7 +130,8 @@
     </div>
     <div id="reflections-row">
       <button id="reflections-go" onclick="saveReflections()">Save to GitHub →</button>
-      <button id="reflections-no" onclick="dismissReflections()">discard</button>
+      <button id="reflections-no" onclick="dismissReflections()">Later</button>
+      <button class="bar-discard" onclick="discardReflections()">discard</button>
       <span id="reflections-st"></span>
     </div>
   </div>
@@ -140,17 +148,6 @@
     </div>
   </div>
 
-  <div id="notes-bar">
-    <div id="notes-top">
-      <span id="notes-lbl">Notes update</span>
-      <span id="notes-files"></span>
-    </div>
-    <div id="notes-row">
-      <button id="notes-go" onclick="saveAllNotes()">Save all →</button>
-      <button id="notes-no" onclick="dismissAllNotes()">discard</button>
-      <span id="notes-st"></span>
-    </div>
-  </div>
 
   <div id="save-bar">
     <div id="save-top">

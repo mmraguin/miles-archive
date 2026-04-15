@@ -50,6 +50,10 @@ const S = {
   _reviewRunning:     false, // true while background patterns review call is in flight
   _deepContext:       null,  // ephemeral deep-fetch context — injected once into next call
   _cachedSysPrompt:   null,  // memoized system prompt — cleared when state changes mid-session
+  _pinnedContextCount:   4,  // messages always preserved from session start (opening exchange + Bevel data)
+  _midSessionSummary:    null, // compressed extraction of the drop zone — injected into every subsequent call this session
+  _summaryCoversThrough: null, // last S.messages index covered by _midSessionSummary (see restoreDraft for post-reload semantics)
+  _compressing:          false, // true while a compression call is in flight — blocks concurrent jobs
 };
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -814,9 +818,13 @@ async function triggerPostEntryReview() {
   const sessionDate = S.sessionDate;
   S._reviewRunning = true;
 
-  const sessionSummary = S.pendingEntry
+  const base = S.pendingEntry
     ? `TODAY'S ENTRY:\n${S.pendingEntry}`
     : S.messages.slice(-10).map(m => `[${m.role.toUpperCase()}]: ${m.content.slice(0, 400)}`).join('\n\n');
+  // Include mid-session summary so patterns review sees the full session, not just the live window
+  const sessionSummary = S._midSessionSummary
+    ? `[EARLIER SESSION CONTENT]\n${S._midSessionSummary}\n\n${base}`
+    : base;
 
   const reviewMessages = [{
     role: 'user',
@@ -833,9 +841,12 @@ async function triggerPostEntryReview() {
     const rawPatterns = extractPatterns(reply);
     if (rawPatterns && !S.pendingPatterns && !S._queuedPatterns) {
       const merged = mergePatternsUpdate(S.patterns || '', rawPatterns);
-      if (!document.getElementById('notes-bar').classList.contains('show')) {
-        S.pendingPatterns = merged;
-        showNotesBar();
+      S._queuedPatterns = merged;
+      // If no note bar is currently visible, start the cascade now;
+      // otherwise the queued item will be picked up when the current bar closes.
+      const noteBarIds = ['pat-bar','goals-summary-bar','insights-bar','people-bar','people-notes-bar','evo-bar','reflections-bar'];
+      if (!noteBarIds.some(id => document.getElementById(id).classList.contains('show'))) {
+        advanceCascade();
       }
     }
     S._reviewFired = true;
@@ -845,6 +856,37 @@ async function triggerPostEntryReview() {
   } finally {
     S._reviewRunning = false;
   }
+}
+
+// ── Mid-session compression ───────────────────────────────────────────────────
+// Extracts stories, insights, and unresolved tensions from a slice of S.messages
+// that has fallen out of the live context window. Called fire-and-forget from
+// sendMsg(); result is stored in S._midSessionSummary and injected persistently
+// into every subsequent call this session.
+//
+// Output is designed to be append-safe: no framing preamble, self-contained
+// entries only. Multiple compression outputs are concatenated with a --- separator.
+async function compressMiddle(messages) {
+  const prompt = `Extract the following content from this session segment. Output self-contained facts, events, and insights — no framing like "earlier in this session" or "the conversation discussed." Write directly. This output may be concatenated with other extracted segments; each entry must stand alone.
+
+STORIES: Every distinct thing Miles narrated about her life — events, experiences, situations she described. Preserve names, specific details, emotional weight, and what remained unresolved. Do not merge or compress separate stories. If she told four stories, list four entries.
+
+INSIGHTS SURFACED: Every reframe, named pattern, mechanism explained, or distinction the assistant offered that Miles engaged with. Write the actual content — the insight itself — not a pointer to it. If specific phrasing landed, keep that phrasing.
+
+FLAGGED TO SAVE: Anything Miles explicitly asked to note, remember, save, or add to records.
+
+UNRESOLVED: Anything Miles raised that was not resolved, deflected, or left hanging — a tension, a question she returned to, something she seemed to be carrying.
+
+Omit sections with no entries. No commentary, no transitions, no framing preamble.`;
+
+  const formatted = messages.map(m => `[${m.role.toUpperCase()}]: ${m.content}`).join('\n\n');
+  const reply = await callClaude(
+    [{ role: 'user', content: formatted }],
+    prompt,
+    false,
+    2000,
+  );
+  return reply.trim();
 }
 
 // ── Review mode system prompt ─────────────────────────────────────────────────
@@ -1072,10 +1114,12 @@ function saveDraft() {
   try {
     const drafts = JSON.parse(localStorage.getItem('ar_drafts') || '[]');
     drafts.unshift({
-      date:     S.sessionDate,
-      messages: S.messages.slice(-20),
-      brief:    S.brief,
-      ts:       Date.now(),
+      date:                 S.sessionDate,
+      messages:             S.messages.slice(-20),
+      brief:                S.brief,
+      midSessionSummary:    S._midSessionSummary    || null,
+      summaryCoversThrough: S._summaryCoversThrough || null,
+      ts:                   Date.now(),
     });
     localStorage.setItem('ar_drafts', JSON.stringify(drafts.slice(0, 3)));
   } catch(e) {
@@ -1461,7 +1505,8 @@ async function saveEntry() {
     setTimeout(() => {
       document.getElementById('save-bar').classList.remove('show');
       document.getElementById('save-st').className = '';
-      showNotesBar();
+      updatePendingBadge();
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setSaveSt('err', friendlyError(err));
@@ -1473,7 +1518,8 @@ function dismissSave() {
   S.pendingEntry = null; S.pendingPath = null;
   document.getElementById('save-bar').classList.remove('show');
   document.getElementById('save-st').className = '';
-  showNotesBar();
+  updatePendingBadge();
+  advanceCascade();
 }
 
 // ── State doc save ────────────────────────────────────────────────────────────
@@ -1531,9 +1577,10 @@ function showPatBar(content) {
 }
 
 function dismissPatterns() {
-  S.pendingPatterns = null;
+  // S.pendingPatterns retained — user can recover via pending badge
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
+  updatePendingBadge();
   advanceCascade();
 }
 
@@ -1552,6 +1599,7 @@ async function savePatterns() {
     setTimeout(() => {
       document.getElementById('pat-bar').classList.remove('show');
       document.getElementById('pat-st').className = '';
+      updatePendingBadge();
       advanceCascade();
     }, 2400);
   } catch(err) {
@@ -1574,9 +1622,10 @@ function showGoalsSummaryBar(content) {
 }
 
 function dismissGoalsSummary() {
-  S.pendingGoalsSummary = null;
+  // S.pendingGoalsSummary retained — user can recover via pending badge
   document.getElementById('goals-summary-bar').classList.remove('show');
   document.getElementById('goals-summary-st').className = '';
+  updatePendingBadge();
   advanceCascade();
 }
 
@@ -1595,6 +1644,7 @@ async function saveGoalsSummary() {
     setTimeout(() => {
       document.getElementById('goals-summary-bar').classList.remove('show');
       document.getElementById('goals-summary-st').className = '';
+      updatePendingBadge();
       advanceCascade();
     }, 2400);
   } catch(err) {
@@ -1617,9 +1667,10 @@ function showInsightsBar(content) {
 }
 
 function dismissInsights() {
-  S.pendingInsights = null;
+  // S.pendingInsights retained — user can recover via pending badge
   document.getElementById('insights-bar').classList.remove('show');
   document.getElementById('insights-st').className = '';
+  updatePendingBadge();
   saveThreads();
   advanceCascade();
 }
@@ -1639,6 +1690,7 @@ async function saveInsights() {
     setTimeout(() => {
       document.getElementById('insights-bar').classList.remove('show');
       document.getElementById('insights-st').className = '';
+      updatePendingBadge();
       saveThreads();
       advanceCascade();
     }, 2400);
@@ -1648,7 +1700,7 @@ async function saveInsights() {
   }
 }
 
-// ── Threads auto-save (silent, called from saveAllNotes) ──────────────────────
+// ── Threads auto-save (silent, fire-and-forget) ───────────────────────────────
 async function saveThreads() {
   if (!S._pendingThreads) return;
   const content = S._pendingThreads;
@@ -1663,104 +1715,121 @@ async function saveThreads() {
   }
 }
 
-// ── Notes save-all bar ────────────────────────────────────────────────────────
-function showNotesBar() {
-  // Flush any queued items into pending
-  if (S._queuedPatterns)     { S.pendingPatterns     = S._queuedPatterns;     S._queuedPatterns     = null; }
-  if (S._queuedGoalsSummary) { S.pendingGoalsSummary = S._queuedGoalsSummary; S._queuedGoalsSummary = null; }
-  if (S._queuedInsights)     { S.pendingInsights     = S._queuedInsights;     S._queuedInsights     = null; }
-  if (S._queuedPeople)       { S.pendingPeople       = S._queuedPeople;       S._queuedPeople       = null; }
-  if (S._queuedPeopleNotes)  { S.pendingPeopleNotes  = S._queuedPeopleNotes;  S._queuedPeopleNotes  = null; }
-  if (S._queuedEvolution)    { S.pendingEvolution    = S._queuedEvolution;    S._queuedEvolution    = null; }
-  if (S._queuedReflections)  { S.pendingReflections  = S._queuedReflections;  S._queuedReflections  = null; }
-
-  const files = [
-    S.pendingPatterns     && 'patterns',
-    S.pendingGoalsSummary && 'goals-summary',
-    S.pendingInsights     && 'insights',
-    S._pendingThreads     && 'threads',
-    S.pendingPeople       && 'people profile',
-    S.pendingPeopleNotes  && 'people notes',
-    S.pendingEvolution    && 'evolution',
-    S.pendingReflections  && 'reflections',
-  ].filter(Boolean);
-
-  if (!files.length) return;
-
-  document.getElementById('notes-files').textContent = files.join(' · ');
-  document.getElementById('notes-go').disabled = false;
-  document.getElementById('notes-st').className = '';
-  document.getElementById('notes-bar').classList.add('show');
-}
-
-async function saveAllNotes() {
-  const btn = document.getElementById('notes-go');
-  btn.disabled = true;
-  const st = document.getElementById('notes-st');
-
-  const saves = [
-    S.pendingPatterns     && ['notes/patterns.md',      'patterns: update notes/patterns.md',      () => S.pendingPatterns,     (c) => { S.pendingPatterns = null;     S.patterns = c;        S._cachedSysPrompt = null; addSys('patterns updated → notes/patterns.md'); }],
-    S.pendingGoalsSummary && ['notes/goals-summary.md', 'goals-summary: update notes/goals-summary.md', () => S.pendingGoalsSummary, (c) => { S.pendingGoalsSummary = null; S.goals = c;           S._cachedSysPrompt = null; addSys('goals summary updated → notes/goals-summary.md'); }],
-    S.pendingInsights     && ['notes/chat-insights.md', 'insights: update notes/chat-insights.md', () => S.pendingInsights,     (c) => { S.pendingInsights = null;     S.chatInsights = c;    S._cachedSysPrompt = null; addSys('insights updated → notes/chat-insights.md'); }],
-    S._pendingThreads     && ['notes/threads.md',       'threads: update notes/threads.md',        () => S._pendingThreads,     (c) => { S._pendingThreads = null;     S.threads = c;         S._cachedSysPrompt = null; addSys('threads updated → notes/threads.md'); }],
-    S.pendingPeople       && ['notes/people-profile.md','people: update notes/people-profile.md',  () => S.pendingPeople,       (c) => { S.pendingPeople = null;       S.peopleProfile = c;   S._cachedSysPrompt = null; addSys('people profile updated → notes/people-profile.md'); }],
-    S.pendingPeopleNotes  && ['notes/people-notes.md',  'people-notes: update notes/people-notes.md', () => S.pendingPeopleNotes,  (c) => { S.pendingPeopleNotes = null;  S.peopleNotes = c;     S._cachedSysPrompt = null; addSys('people notes updated → notes/people-notes.md'); }],
-    S.pendingEvolution    && ['notes/evolution.md',     'evolution: update notes/evolution.md',    () => S.pendingEvolution,    (c) => { S.pendingEvolution = null;    S.evolution = c; S.evoTrigger = false; S._cachedSysPrompt = null; try { localStorage.setItem('ar_evo_offered', S.sessionDate); } catch(e) {} addSys('evolution updated → notes/evolution.md'); }],
-  ].filter(Boolean);
-
-  const failed = [];
-
-  for (const [path, msg, getContent, onSuccess] of saves) {
-    const c = getContent();
-    st.className = 'show info'; st.textContent = `writing ${path.split('/').pop()}…`;
-    try {
-      await githubPut(path, c, msg);
-      onSuccess(c);
-    } catch(e) {
-      failed.push(path.split('/').pop());
-      addSys(`${path.split('/').pop()} save failed: ${friendlyError(e)}`);
-    }
-  }
-
-  if (S.pendingReflections) {
-    const c = S.pendingReflections;
-    st.className = 'show info'; st.textContent = 'writing reflections.md…';
-    try {
-      const { sha, content: existing } = await getFileInfo('notes/reflections.md');
-      const merged = mergeReflectionsUpdate(existing, c);
-      await githubPut('notes/reflections.md', merged, 'reflections: update notes/reflections.md', sha);
-      S.pendingReflections = null;
-      S.reflections = merged;
-      addSys('reflections updated → notes/reflections.md');
-    } catch(e) {
-      failed.push('reflections.md');
-      addSys(`reflections save failed: ${friendlyError(e)}`);
-    }
-  }
-
-  if (failed.length) {
-    st.className = 'show err'; st.textContent = `failed: ${failed.join(', ')} — retry`;
-    btn.disabled = false;
+// ── Pending badge + queue recovery ────────────────────────────────────────────
+// Updates the small nav indicator showing how many notes are retained (Later'd) this session.
+function updatePendingBadge() {
+  const count = [
+    S.pendingPatterns, S.pendingGoalsSummary, S.pendingInsights,
+    S.pendingPeople, S.pendingPeopleNotes, S.pendingEvolution, S.pendingReflections,
+  ].filter(Boolean).length;
+  const badge = document.getElementById('pending-badge');
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = `${count} unsaved`;
+    badge.classList.add('show');
   } else {
-    st.className = 'show ok'; st.textContent = 'saved';
-    setTimeout(() => {
-      document.getElementById('notes-bar').classList.remove('show');
-      st.className = '';
-    }, 2400);
+    badge.classList.remove('show');
+    badge.textContent = '';
   }
 }
 
-function dismissAllNotes() {
-  S.pendingPatterns = null;     S._queuedPatterns     = null;
-  S.pendingGoalsSummary = null; S._queuedGoalsSummary = null;
-  S.pendingInsights = null;     S._queuedInsights     = null;
-  S._pendingThreads = null;
-  S.pendingPeople = null;       S._queuedPeople       = null;
-  S.pendingPeopleNotes = null;  S._queuedPeopleNotes  = null;
-  S.pendingEvolution = null;    S._queuedEvolution    = null;
-  S.pendingReflections = null;  S._queuedReflections  = null;
-  document.getElementById('notes-bar').classList.remove('show');
-  document.getElementById('notes-st').className = '';
+// Re-surfaces the first retained note bar on badge click.
+function openPendingQueue() {
+  const items = [
+    [S.pendingPatterns,     showPatBar],
+    [S.pendingGoalsSummary, showGoalsSummaryBar],
+    [S.pendingInsights,     showInsightsBar],
+    [S.pendingPeople,       showPeopleBar],
+    [S.pendingPeopleNotes,  showPeopleNotesBar],
+    [S.pendingEvolution,    showEvoBar],
+    [S.pendingReflections,  showReflectionsBar],
+  ];
+  for (const [content, fn] of items) {
+    if (content) { fn(content); return; }
+  }
+}
+
+// Discard functions — explicit clear (distinct from Later/dismiss which retains).
+function discardPatterns()    { S.pendingPatterns     = null; document.getElementById('pat-bar').classList.remove('show');          document.getElementById('pat-st').className          = ''; updatePendingBadge(); advanceCascade(); }
+function discardGoalsSummary(){ S.pendingGoalsSummary = null; document.getElementById('goals-summary-bar').classList.remove('show'); document.getElementById('goals-summary-st').className = ''; updatePendingBadge(); advanceCascade(); }
+function discardInsights()    { S.pendingInsights     = null; document.getElementById('insights-bar').classList.remove('show');      document.getElementById('insights-st').className      = ''; updatePendingBadge(); advanceCascade(); }
+function discardPeople()      { S.pendingPeople       = null; document.getElementById('people-bar').classList.remove('show');        document.getElementById('people-st').className        = ''; updatePendingBadge(); advanceCascade(); }
+function discardPeopleNotes() { S.pendingPeopleNotes  = null; document.getElementById('people-notes-bar').classList.remove('show');  document.getElementById('people-notes-st').className  = ''; updatePendingBadge(); advanceCascade(); }
+function discardEvolution()   { S.pendingEvolution    = null; document.getElementById('evo-bar').classList.remove('show');           document.getElementById('evo-st').className           = ''; updatePendingBadge(); advanceCascade(); }
+function discardReflections() { S.pendingReflections  = null; document.getElementById('reflections-bar').classList.remove('show');   document.getElementById('reflections-st').className   = ''; updatePendingBadge(); advanceCascade(); }
+
+// Saves all retained pending notes in parallel, then clears the session.
+// Called from _pendingClearPrompt when user chooses "save all".
+// Uses Promise.allSettled so partial GitHub failures don't silently discard unsaved notes:
+// only fully successful saves are cleared from pending state; failed saves remain for recovery.
+async function _saveAllPendingAndClear() {
+  const jobs = [];
+  if (S.pendingPatterns)     jobs.push({ field: 'pendingPatterns',     p: githubPut('notes/patterns.md',       S.pendingPatterns,     'patterns: update notes/patterns.md') });
+  if (S.pendingGoalsSummary) jobs.push({ field: 'pendingGoalsSummary', p: githubPut('notes/goals-summary.md',  S.pendingGoalsSummary, 'goals-summary: update notes/goals-summary.md') });
+  if (S.pendingInsights)     jobs.push({ field: 'pendingInsights',     p: githubPut('notes/chat-insights.md',  S.pendingInsights,     'insights: update notes/chat-insights.md') });
+  if (S.pendingPeople)       jobs.push({ field: 'pendingPeople',       p: githubPut('notes/people-profile.md', S.pendingPeople,       'people: update notes/people-profile.md') });
+  if (S.pendingPeopleNotes)  jobs.push({ field: 'pendingPeopleNotes',  p: githubPut('notes/people-notes.md',   S.pendingPeopleNotes,  'people-notes: update notes/people-notes.md') });
+  if (S.pendingEvolution)    jobs.push({ field: 'pendingEvolution',    p: githubPut('notes/evolution.md',      S.pendingEvolution,    'evolution: update notes/evolution.md') });
+  if (S.pendingReflections) {
+    jobs.push({ field: 'pendingReflections', p:
+      getFileInfo('notes/reflections.md').then(({ sha, content: existing }) =>
+        githubPut('notes/reflections.md', mergeReflectionsUpdate(existing, S.pendingReflections), 'reflections: update notes/reflections.md', sha)
+      )
+    });
+  }
+
+  const results = await Promise.allSettled(jobs.map(j => j.p));
+  const failedNames = [];
+  const fieldLabels = {
+    pendingPatterns:     'patterns',
+    pendingGoalsSummary: 'goals summary',
+    pendingInsights:     'insights',
+    pendingPeople:       'people profile',
+    pendingPeopleNotes:  'people notes',
+    pendingEvolution:    'evolution',
+    pendingReflections:  'reflections',
+  };
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      S[jobs[i].field] = null;
+    } else {
+      failedNames.push(fieldLabels[jobs[i].field] || jobs[i].field);
+      console.warn(`[save all pending] ${jobs[i].field} failed:`, r.reason?.message);
+    }
+  });
+
+  updatePendingBadge();
+  if (failedNames.length > 0) {
+    addSys(`could not save: ${failedNames.join(', ')} — still available via the pending badge`);
+  } else {
+    _clearAndStart();
+  }
+}
+
+// Inline prompt for resolving retained notes before session reset.
+function _pendingClearPrompt() {
+  const existing = document.getElementById('inline-confirm');
+  if (existing) existing.remove();
+  const count = [
+    S.pendingPatterns, S.pendingGoalsSummary, S.pendingInsights,
+    S.pendingPeople, S.pendingPeopleNotes, S.pendingEvolution, S.pendingReflections,
+  ].filter(Boolean).length;
+  const bar = document.createElement('div');
+  bar.id = 'inline-confirm';
+  const span = document.createElement('span');
+  span.className = 'ic-msg';
+  span.textContent = `${count} unsaved note${count === 1 ? '' : 's'} from this session — save or discard before clearing`;
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'ic-yes'; saveBtn.textContent = 'save all';
+  saveBtn.onclick = () => { bar.remove(); _saveAllPendingAndClear(); };
+  const discardBtn = document.createElement('button');
+  discardBtn.className = 'ic-no'; discardBtn.textContent = 'discard';
+  discardBtn.onclick = () => { bar.remove(); _clearAndStart(); };
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'ic-no'; cancelBtn.textContent = 'cancel';
+  cancelBtn.onclick = () => bar.remove();
+  bar.append(span, saveBtn, discardBtn, cancelBtn);
+  document.getElementById('input-wrap').prepend(bar);
 }
 
 // ── People profile save ───────────────────────────────────────────────────────
@@ -1777,9 +1846,10 @@ function showPeopleBar(content) {
 }
 
 function dismissPeople() {
-  S.pendingPeople = null;
+  // S.pendingPeople retained — user can recover via pending badge
   document.getElementById('people-bar').classList.remove('show');
   document.getElementById('people-st').className = '';
+  updatePendingBadge();
   advanceCascade();
 }
 
@@ -1797,6 +1867,7 @@ async function savePeople() {
     setTimeout(() => {
       document.getElementById('people-bar').classList.remove('show');
       document.getElementById('people-st').className = '';
+      updatePendingBadge();
       advanceCascade();
     }, 2400);
   } catch(err) {
@@ -1819,9 +1890,10 @@ function showPeopleNotesBar(content) {
 }
 
 function dismissPeopleNotes() {
-  S.pendingPeopleNotes = null;
+  // S.pendingPeopleNotes retained — user can recover via pending badge
   document.getElementById('people-notes-bar').classList.remove('show');
   document.getElementById('people-notes-st').className = '';
+  updatePendingBadge();
   advanceCascade();
 }
 
@@ -1839,6 +1911,7 @@ async function savePeopleNotes() {
     setTimeout(() => {
       document.getElementById('people-notes-bar').classList.remove('show');
       document.getElementById('people-notes-st').className = '';
+      updatePendingBadge();
       advanceCascade();
     }, 2400);
   } catch(err) {
@@ -1864,7 +1937,8 @@ function dismissReview() {
   S.pendingReview = null;
   document.getElementById('review-bar').classList.remove('show');
   document.getElementById('review-st').className = '';
-  showNotesBar();
+  updatePendingBadge();
+  advanceCascade();
 }
 
 async function saveReview() {
@@ -1883,7 +1957,8 @@ async function saveReview() {
     setTimeout(() => {
       document.getElementById('review-bar').classList.remove('show');
       document.getElementById('review-st').className = '';
-      showNotesBar();
+      updatePendingBadge();
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setReviewSt('err', friendlyError(err));
@@ -1905,9 +1980,10 @@ function showEvoBar(content) {
 }
 
 function dismissEvolution() {
-  S.pendingEvolution = null;
+  // S.pendingEvolution retained — user can recover via pending badge
   document.getElementById('evo-bar').classList.remove('show');
   document.getElementById('evo-st').className = '';
+  updatePendingBadge();
   advanceCascade();
 }
 
@@ -1927,6 +2003,7 @@ async function saveEvolution() {
     setTimeout(() => {
       document.getElementById('evo-bar').classList.remove('show');
       document.getElementById('evo-st').className = '';
+      updatePendingBadge();
       advanceCascade();
     }, 2400);
   } catch(err) {
@@ -1949,9 +2026,11 @@ function showReflectionsBar(content) {
 }
 
 function dismissReflections() {
-  S.pendingReflections = null;
+  // S.pendingReflections retained — user can recover via pending badge
   document.getElementById('reflections-bar').classList.remove('show');
   document.getElementById('reflections-st').className = '';
+  updatePendingBadge();
+  advanceCascade();
 }
 
 function insertAtSectionTop(doc, header, line) {
@@ -2005,6 +2084,8 @@ async function saveReflections() {
     setTimeout(() => {
       document.getElementById('reflections-bar').classList.remove('show');
       document.getElementById('reflections-st').className = '';
+      updatePendingBadge();
+      advanceCascade();
     }, 2400);
   } catch(err) {
     setReflectionsSt('err', friendlyError(err));
@@ -2085,10 +2166,82 @@ async function sendMsg() {
   showDots();
 
   try {
-    // Cap history at 20 messages, preserving the opening exchange + Bevel data for context
-    let callMessages = S.messages.length > 20
-      ? [...S.messages.slice(0, 4), ...S.messages.slice(-16)]
-      : S.messages;
+    // ── Session context windows ────────────────────────────────────────────────
+    // pinned window:  S.messages.slice(0, _pinnedContextCount)   — opening exchange, always sent verbatim
+    // live window:    S.messages.slice(-16)                       — recent turns, always sent verbatim
+    // drop zone:      messages between pinned and live            — compressed when large enough
+    // covered zone:   messages up to index _summaryCoversThrough  — already in _midSessionSummary
+    //
+    // Compression fires fire-and-forget when the drop zone exceeds 4 messages and no job is in
+    // flight. One-turn lag is accepted: the summary is available on the next turn, not the current.
+    // ─────────────────────────────────────────────────────────────────────────
+    const pinnedCount = S._pinnedContextCount;
+    const liveCount   = 16;
+    const dropEnd     = S.messages.length - liveCount; // exclusive: index where live window starts
+    const dropCount   = dropEnd - pinnedCount;          // number of messages currently in the drop zone
+
+    if (dropCount > 4 && !S._compressing) {
+      const sessionDate = S.sessionDate;
+      if (!S._midSessionSummary) {
+        // First compression: summarize the entire current drop zone
+        S._compressing = true;
+        compressMiddle(S.messages.slice(pinnedCount, dropEnd)).then(summary => {
+          if (S.sessionDate !== sessionDate) return; // stale-session guard
+          S._midSessionSummary    = summary;
+          S._summaryCoversThrough = dropEnd - 1;
+          S._compressing          = false;
+        }).catch(err => {
+          console.warn('[compression] failed:', err.message);
+          S._compressing = false;
+        });
+      } else if (S._summaryCoversThrough !== null && dropEnd - 1 > S._summaryCoversThrough + 4) {
+        // Re-compression: new content has fallen into the drop zone since the last summary
+        S._compressing = true;
+        compressMiddle(S.messages.slice(S._summaryCoversThrough + 1, dropEnd)).then(async summary => {
+          if (S.sessionDate !== sessionDate) return; // stale-session guard
+          const appended = S._midSessionSummary + '\n\n---\n\n' + summary;
+          // If the accumulated summary is growing large, recompress it into a single pass
+          // to prevent unbounded token growth. Threshold: ~4 000 chars (~1 000 tokens).
+          if (appended.length > 4000) {
+            try {
+              const recompressed = await callClaude(
+                [{ role: 'user', content: appended }],
+                'Condense the following extracted session notes into a single compact summary. Preserve every story, insight, flagged item, and unresolved tension. Merge duplicate entries. Keep names, specific details, and emotional weight. No framing preamble — output directly.',
+                false,
+                2000,
+              );
+              S._midSessionSummary = recompressed.trim();
+            } catch (err) {
+              console.warn('[compression] summary recompress failed, keeping appended:', err.message);
+              S._midSessionSummary = appended;
+            }
+          } else {
+            S._midSessionSummary = appended;
+          }
+          S._summaryCoversThrough = dropEnd - 1;
+          S._compressing          = false;
+        }).catch(err => {
+          console.warn('[compression] re-compression failed:', err.message);
+          S._compressing = false;
+        });
+      }
+    }
+
+    // Build call context: pinned window + live window; drop zone excluded
+    let callMessages = dropCount > 0
+      ? [...S.messages.slice(0, pinnedCount), ...S.messages.slice(-liveCount)]
+      : [...S.messages];
+
+    // Inject mid-session summary into the current user turn (persistent — not cleared after use,
+    // unlike _deepContext which is single-use). Prepended so context reads before the live message.
+    if (S._midSessionSummary) {
+      const last = callMessages[callMessages.length - 1];
+      callMessages = [
+        ...callMessages.slice(0, -1),
+        { role: 'user', content: `[EARLIER SESSION — extracted; treat as verbatim session content]\n${S._midSessionSummary}\n\n---\n\n${last.content}` },
+      ];
+    }
+
     // Inject ephemeral deep context into the current user turn (not stored in S.messages)
     if (S._deepContext) {
       callMessages = [
@@ -2097,7 +2250,7 @@ async function sendMsg() {
       ];
       S._deepContext = null;
     }
-    const reply = await callClaude(callMessages, null, false, 4096);
+    const reply = await callClaude(callMessages, null, false, 8192);
     hideDots();
     const entry        = S.reviewMode ? null : extractEntry(reply);
     const review       = S.reviewMode ? extractReview(reply) : null;
@@ -2134,7 +2287,11 @@ async function sendMsg() {
     // Queue order (daily):  entry → patterns → goals-summary → insights → people → people-notes → evolution → reflections
     // Queue order (review): review → goals-summary → people-notes → people-profile
     // Queue notes if an entry/review bar is first; otherwise set pending and show immediately
-    if (threads)      S._pendingThreads     = threads;
+    // Threads are saved immediately as a fire-and-forget background write — no UI dependency.
+    // saveThreads() surfaces failure via addSys; silent success is fine.
+    // _pendingThreads is set first so saveThreads() has content, then cleared by saveThreads() itself.
+    // Threads do not appear in the pending badge — they save silently in the background.
+    if (threads) { S._pendingThreads = threads; saveThreads(); }
     if (patterns)     { if (firstBar) S._queuedPatterns     = patterns;     else S.pendingPatterns     = patterns; }
     if (goalsSummary) { if (firstBar) S._queuedGoalsSummary = goalsSummary; else S.pendingGoalsSummary = goalsSummary; }
     if (insights)     { if (firstBar) S._queuedInsights     = insights;     else S.pendingInsights     = insights; }
@@ -2144,7 +2301,7 @@ async function sendMsg() {
     if (reflections)  { if (firstBar) S._queuedReflections  = reflections;  else S.pendingReflections  = reflections; }
     if (review) showReviewBar(review);
     else if (entry) showSaveBar(entry, detectType(reply));
-    if (!firstBar) showNotesBar();
+    if (!firstBar) { advanceCascade(); updatePendingBadge(); }
     setStat('ready', S.reviewMode ? `review — ${S.sessionDate}` : `ready — ${S.sessionDate}`);
     // Trigger deep context fetch in background if signaled
     if (deepFetch && !S.deepFetched) {
@@ -2170,10 +2327,14 @@ async function sendMsg() {
 
 // ── New session ───────────────────────────────────────────────────────────────
 function newSess() {
+  const hasPending = S.pendingPatterns || S.pendingGoalsSummary || S.pendingInsights ||
+    S.pendingPeople || S.pendingPeopleNotes || S.pendingEvolution || S.pendingReflections;
+  if (hasPending) {
+    _pendingClearPrompt();
+    return;
+  }
   if (S.messages.length > 0) {
-    inlineConfirm('clear this session?', function() {
-      _clearAndStart();
-    });
+    inlineConfirm('clear this session?', _clearAndStart);
     return;
   }
   _clearAndStart();
@@ -2209,8 +2370,7 @@ function _clearAndStart() {
   document.getElementById('evo-st').className = '';
   document.getElementById('reflections-bar').classList.remove('show');
   document.getElementById('reflections-st').className = '';
-  document.getElementById('notes-bar').classList.remove('show');
-  document.getElementById('notes-st').className = '';
+  updatePendingBadge();
   document.getElementById('brief-btn').classList.remove('on');
   syncBriefBtn();
   document.getElementById('review-btn').classList.remove('on');
@@ -2571,6 +2731,15 @@ function restoreDraft(draft) {
   S.messages    = draft.messages;
   S.sessionDate = draft.date || S.sessionDate;
   S.brief       = draft.brief || false;
+  S._midSessionSummary = draft.midSessionSummary || null;
+  // _summaryCoversThrough is stored as a pre-reload absolute session index, which is no longer
+  // valid after reload since S.messages is only the last 20 messages of the old session.
+  // Recalculate as a best-effort starting point: treat the restored live window boundary
+  // (messages beyond pinnedCount that are now accessible) as the new covered floor.
+  // Re-compression after reload will only target newly dropped content from this point forward.
+  S._summaryCoversThrough = draft.midSessionSummary
+    ? Math.max(-1, draft.messages.length - 16 - 1)
+    : null;
   document.getElementById('brief-btn').classList.toggle('on', S.brief);
   syncBriefBtn();
   document.getElementById('wm-date').textContent = fmtDisplayDate(S.sessionDate);
