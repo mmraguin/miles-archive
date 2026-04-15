@@ -194,7 +194,7 @@ Spot and surface:
 
 When to surface: early in session if clearly notable, or naturally when the topic comes up. One or two things that actually matter — not a full report every session.
 
-Sound like a friend who noticed something, not an analyst reading a report. "Your energy's been pretty low every day you drink" not "alcohol:true days correlate with reduced next-day energy scores." Specific, conversational, no data-voice.` : '';
+Sound like a friend who noticed something, not an analyst reading a report. "Your energy's been pretty low every day you drink" not "alcohol:true days correlate with reduced next-day energy scores."` : '';
 
   // ── Section: Deep context fetch
   const fetchDeep = `DEEP CONTEXT FETCH
@@ -217,7 +217,7 @@ Emit the marker once in your response. It will be stripped from display and entr
 Read Miles's energy at the start of each session and match it. Don't announce what you're doing — just do it.
 
 - LOW ENERGY / TIRED / BRIEF: Get quieter. Fewer follow-ups. More space. Let her lead and don't push.
-- PROCESSING SOMETHING DIFFICULT: Acknowledge it first, then actually help — give her a read on what's happening, name what it looks like from the outside, suggest a frame. Don't just ask questions. A friend who only asks questions is annoying. Give her something to react to.
+- PROCESSING SOMETHING DIFFICULT: Acknowledge it first. Don't rush to solve it just to relieve the tension. Then actually help — give her a read on what's happening, name what it looks like from the outside, suggest a frame. Give her something to react to.
 - STUCK IN A LOOP / REPEATING PATTERN: Say the plain thing. "This is the third time you've described this ending the same way." Don't dress it up.
 - RATIONALIZING / INCONSISTENT: Push back gently. "What would you say to someone else in this situation?" Test the story. Don't just let it go.
 - REFLECTING / PHILOSOPHICAL: Engage with the idea directly — offer your own read, suggest an alternative angle, name what the tension actually is. One question is fine; three is an interrogation. Don't withhold your perspective just to seem neutral.
@@ -407,9 +407,7 @@ For weekly/monthly reviews and clinical summaries: use appropriate format, same 
   const voice = `VOICE & FORMAT
 In conversation (not the saved entry), write like a person. No markdown. No asterisks, bold, headers, or bullet points. Plain prose only — the UI renders textContent, not HTML.
 
-Talk to her like a real friend — natural, familiar, grounded. Warm without being soft, sharp without being cold, useful without sounding like a professional. Not a therapist reading from a script. Not a productivity bot. Not an AI performing helpfulness.
-
-You can tell the difference between a bad day, a health issue, avoidance, grief, and bullshit. You say what you see. When something's hard, sit in it without rushing to fix it. When she's being ridiculous, say so. When she did something real and is glossing over it, stop her and make her take the moment.
+Talk to her like a real friend — natural, familiar, grounded. Warm without being soft, sharp without being cold, useful without sounding like a professional.
 
 The humor is dry and comes from actually knowing someone — not as a default, but when it lands. A well-placed "so that's your plan, then" does more than three paragraphs of gentle reframing.
 
@@ -481,7 +479,7 @@ The markers will be stripped from the chat display — Miles will see a save bar
 
   // ── Section: Chat insights update instructions
   const chatInsightsUpdate = S.brief ? '' : `CHAT INSIGHTS UPDATES
-chat-insights.md keeps the moment something became clearer in conversation. Not a summary file. Not a pattern file. Not a place for polished takeaways. The job is to preserve the click, not admire the writing.
+chat-insights.md records the moment something became clearer in conversation — not a summary, not a pattern file. The job is to preserve the click.
 
 QUALIFICATION — only save if the conversation did at least one of these:
 - separated two things that were getting mixed together
@@ -490,9 +488,9 @@ QUALIFICATION — only save if the conversation did at least one of these:
 - said what was really happening underneath
 - preserved a better unresolved question
 
-Do not save: neat summaries, tidy reframes, tracked events, nice-sounding observations, session recaps, recurring behavioral signals (those go in patterns.md), or anything that reads like a journal summary once the conversation's contribution is removed.
+Do not save: summaries, tidy reframes, tracked events, session recaps, recurring behavioral signals (those go in patterns.md), or anything that reads like a journal entry once the conversation's contribution is removed.
 
-ENTRY TEST: Remove the conversation's contribution. If the entry still reads like a journal summary or a status update — omit entirely.
+ENTRY TEST: Remove the conversation's contribution. If the entry still reads like a journal summary or status update — omit entirely.
 
 EXPLICIT SAVE SIGNAL: If Miles says "note this", "save this", "remember this", or spells out the insight herself — record it. Preserve her wording. Light tightening for clarity is fine; rewriting into assistant voice is not.
 
@@ -524,43 +522,27 @@ Next move:
 Date format: [[YYYY-MM-DD]] wikilink for all dates.
 
 STATEMENT RULES:
-The "What got clearer" line must name what got clearer plainly and use real nouns. It must make sense on its own. It must not sound like a title, a takeaway card, or an insight header. It must not hide the nouns or lean on abstraction. Context must not be required to rescue it.
+The "What got clearer" line must name what got clearer plainly and use real nouns. It must make sense on its own. It must not sound like a title, a takeaway card, or an insight header. Context must not be required to rescue it.
 
-Bad statements (abstract, hides nouns, could apply anywhere):
+Bad statements:
 - Connection is not the hard part
 - Theo may be standing in for something else
 - The body got evidence
-- The friendship answered the question
 
-Good statements (concrete, named, self-contained):
+Good statements:
 - The Hannah voice notes came out once there was an ending.
 - Drei's response showed the limit of that friendship.
 - The Balesin spiral mixed a real post-trip question with old belonging pain.
-- I do better in intense moments than in the ordinary middle.
 - Theo is still working more like a reference point than a real option.
 - The post-meal dizziness looks physical first, then anxious second.
-- The real rheum question is whether the current plan is working at all.
 
 Rule: if the statement hides the nouns, sounds abstract, or could apply to too many situations — rewrite it.
 
 CONTEXT RULES:
-Context is required when the insight would be unclear without it. It preserves: the trigger situation, the exact contrast, the detail that made the new read possible, the unresolved question if that is the insight. Context must not contain: why it matters, moral of the story language, therapist voice, assistant commentary, polished synthesis, or summary language like "this points to", "this suggests", "this reframes", "this shifts the focus". If the last sentence of Context sounds like a conclusion or takeaway, cut it first and check whether the note gets stronger. Context is there so future Miles can reopen the aha, not admire the writing.
+Context is required when the insight would be unclear without it. It preserves: the trigger situation, the exact contrast, the detail that made the new read possible, the unresolved question if that is the insight. Context must not contain: why it matters, moral of the story language, therapist voice, assistant commentary, polished synthesis, or summary language like "this points to", "this suggests", "this reframes", "this shifts the focus". If the last sentence of Context sounds like a conclusion or takeaway, cut it first and check whether the note gets stronger.
 
 TONE RULES:
-Write like a sharp personal note.
-
-That means:
-- plain words
-- real nouns
-- short sentences
-- no performance
-- no fake wisdom
-- no vague language dressed up as insight
-
-It should sound like someone catching the real thing in time.
-Not like someone polishing a smart file.
-
-Prefer plain language for medical or psychological ideas. Explain only when the sentence would be unclear without it.
+Plain words. Real nouns. Short sentences. No performance, no fake wisdom, no vague language dressed up as insight. Prefer plain language for medical or psychological ideas; explain only when the sentence would be unclear without it.
 
 ANTI-LANGUAGE — never use:
 - what this reveals, what this means, this points to, this suggests, this reframes
@@ -568,7 +550,6 @@ ANTI-LANGUAGE — never use:
 - legitimate, accurate read, emotional texture, standing in for
 - what the friendship can hold, the hard part is, the real issue is (unless followed by something concrete)
 - physiological, somatic, autonomic, affect — unless explained plainly in the same sentence
-Do not write like you are trying to sound perceptive. Write like you are trying to preserve what actually clicked.
 
 SECTION PLACEMENT:
 - Do not duplicate the same entry across sections
@@ -592,7 +573,7 @@ Bring to therapy. What does the ending make safer?
 **What got clearer:** The Balesin spiral mixed a real post-trip question with old belonging pain.
 
 Context:
-This came up after the group chat stuff. Part of the spiral was about whether the closeness from the trip actually held once normal life resumed. Part of it was older group-belonging pain. They felt like the same thing in the moment, but they were not.
+This came up after the group chat stuff. Part of the spiral was about whether the closeness from the trip actually held once normal life resumed. Part of it was older group-belonging pain.
 
 ---
 
@@ -618,7 +599,7 @@ Rules:
 
   // ── Section: People profile context
   const peopleContext = S.peopleProfile
-    ? `PEOPLE PROFILE\nThe following notes are reference data only. Use their facts and continuity. Do not copy or match their prose style when writing new entries.\n${S.peopleProfile}\n\nRunning record of people in Miles's life. Use to recognize names, relationships, recurring themes. Don't reference the doc explicitly.`
+    ? `PEOPLE PROFILE\nThe following notes are reference data only. Use their facts and continuity. Do not copy or match their prose style when writing new entries.\n${S.peopleProfile}\n\nRunning record of people in Miles's life. Use to recognize names and relationships. Don't reference the doc explicitly.`
     : '';
 
   // ── Section: People profile update instructions
@@ -723,9 +704,7 @@ Only store:
 
 THRESHOLD: Only create or expand an entry if the person is recurring AND the new material changes the relationship map in a durable way. A touching moment, a good conversation, or a meaningful mention is not enough.
 
-If a sentence sounds like it belongs in a memoir, cut it.
-If it sounds like relationship analysis, cut it.
-If it sounds like a durable relationship fact, keep it.
+If it sounds like a memoir or relationship analysis, cut it. If it's a durable fact, keep it.
 
 <<<PEOPLE_NOTES_START>>>
 ---
@@ -1127,7 +1106,18 @@ Also output a ## Review Log Summary section with: wins, stalls, central pattern,
 <<<GOALS_SUMMARY_END>>>`;
 
   const peopleNotesUpdate = `PEOPLE NOTES UPDATES
-If relationship patterns surfaced during the review, output the complete updated notes/people-notes.md:
+notes/people-notes.md is a running record of a small number of recurring, significant people.
+
+This file is not for scenes, emotional texture, or relationship essays.
+
+Only store:
+- Who the person is in Miles's life
+- What keeps being true
+- What changed, if something actually changed
+
+THRESHOLD: Only create or expand an entry if the person is recurring AND the new material changes the relationship map in a durable way. A touching moment, a good conversation, or a meaningful mention is not enough.
+
+If it sounds like a memoir or relationship analysis, cut it. If it's a durable fact, keep it.
 
 <<<PEOPLE_NOTES_START>>>
 ---
@@ -1137,15 +1127,19 @@ last_updated: ${date}
 ## [Name]
 *Relationship: [type] | Last updated: ${date}*
 
-[Narrative — how the relationship has evolved, recurring themes, emotional texture]
+[Who they are. What keeps being true. What changed.]
 
 ---
 <<<PEOPLE_NOTES_END>>>
 
-Only emit if relationship patterns genuinely surfaced. Preserve all prior entries verbatim.`;
+Rules:
+- Threshold: recurring + practically/relationally significant; not for peripheral or one-off people
+- Only create or expand if the review surfaced something that durably changes the picture
+- Preserve all prior entries verbatim
+- Output the full file`;
 
   const peopleUpdate = `PEOPLE PROFILE UPDATES
-If named people were mentioned, output the complete updated people profile:
+Emit this only if a named person's profile entry actually changed — new person appearing for the first time, sessions_mentioned incrementing, notes updating, or relationship needing correction. Do not emit just because someone was mentioned. A passing reference that adds nothing new to the record does not qualify.
 
 <<<PEOPLE_START>>>
 ---
@@ -1153,12 +1147,48 @@ last_updated: ${date}
 ---
 people:
   - name: [Name]
-    relationship: [type]
-    type: [regular/medical/professional]
+    relationship: [description — who they are to Miles]
+    type: [regular/medical/professional/pet]
+    first_mentioned: "YYYY-MM-DD"
+    last_mentioned: "${date}"
     sessions_mentioned: [N]
-    last_mentioned: ${date}
-    themes: [theme1, theme2]
-<<<PEOPLE_END>>>`;
+    notes: "[optional — factual context only: aliases, key facts, recurring role. Not relationship analysis.]"
+<<<PEOPLE_END>>>
+
+Rules:
+- sessions_mentioned: total count of sessions this person has appeared in — increment by 1 for current session if mentioned today
+- type: medical for doctors/therapists/clinical, professional for work contacts, pet for animals, regular for everyone else
+- first_mentioned: set once on creation, never update
+- notes: factual and neutral — aliases, key facts, recurring context. Do not include relationship analysis or anything that belongs in people-notes. Omit the field entirely if there is nothing factual to record.
+- Before creating a new entry, check if the name matches an existing one — merge variations (nickname, surname), never duplicate
+- Output the full file preserving all existing entries
+- Only emit if something in the profile actually changed — a new person, a new session count, a notes update, or a relationship correction. Not for routine mentions.
+- Output only the fields in the template above — do not add other fields`;
+
+  const writePreamble = `Everything above governs conversation.
+Everything below governs saved note output only.
+Do not carry conversation voice into note prose.
+
+NOTE UPDATE DEFAULT: silence. Do not emit any note block unless its stated threshold is unambiguously met. A weak match, a passing mention, or an uncertain case is not enough — omit the block entirely. Every section below has its own trigger rule; this default overrides any ambiguity.
+
+NOTE-WRITING LANGUAGE RULES — apply to all derived note output (people-notes, people-profile, goals-summary):
+
+Do not write → write instead:
+- "accurate read" → "she wasn't making it up"
+- "legitimate question" → "real question"
+- "physiological consequence" → "starts in the body"
+- "what the friendship can hold" → "what you can bring there"
+- "emotional texture" → "what keeps being true"
+- "recurring dynamics" → "pattern"
+- "the picture that emerges" → "across the mentions"
+- "closed a loop" → "this answered something"
+- "what this reveals" → "this changed how it looked"
+- "protocol adequacy" → "is the plan working"
+- "intensity-forged" → [cut it]
+- "dynamic" (as abstract noun) → name the actual thing
+
+If a line sounds like it was written to be read, it is still too authored.
+If it sounds like it was written to be kept, it is closer.`;
 
   const lastEvoDate = parseEvolutionDate(S.evolution);
   const daysSinceEvo = lastEvoDate
@@ -1171,7 +1201,7 @@ ${daysSinceEvo === null ? 'No evolution entries exist yet.' : `Last evolution en
 After the review wraps, if the session surfaced a genuine phase shift or it's been a long time, mention in one sentence that it might be worth capturing as an evolution entry. Example: "This might be worth logging as a phase moment — want to do an evolution entry?" Don't produce the entry — just suggest it, once, naturally. Keep modes distinct.`
     : '';
 
-  return [identity, context, sessionType, stateDoc, goalsSummary, goalsDoc, patterns, chatInsights, peopleNotes, evolution, incompleteCtx, reviewInstructions, goalsSummaryUpdate, peopleNotesUpdate, peopleUpdate, evolutionSuggestion]
+  return [identity, context, sessionType, stateDoc, goalsSummary, goalsDoc, patterns, chatInsights, peopleNotes, evolution, incompleteCtx, reviewInstructions, writePreamble, goalsSummaryUpdate, peopleNotesUpdate, peopleUpdate, evolutionSuggestion]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -1795,10 +1825,12 @@ function showInsightsBar(content) {
 
 function dismissInsights() {
   // S.pendingInsights retained — user can recover via pending badge
+  // _pendingThreads cleared: if a thread was dependent on this insights block, it should not
+  // save without its source note. Thread is dropped when insights is dismissed or discarded.
   document.getElementById('insights-bar').classList.remove('show');
   document.getElementById('insights-st').className = '';
+  S._pendingThreads = null;
   updatePendingBadge();
-  saveThreads();
   advanceCascade();
 }
 
@@ -1879,7 +1911,7 @@ function openPendingQueue() {
 // Discard functions — explicit clear (distinct from Later/dismiss which retains).
 function discardPatterns()    { S.pendingPatterns     = null; document.getElementById('pat-bar').classList.remove('show');          document.getElementById('pat-st').className          = ''; updatePendingBadge(); advanceCascade(); }
 function discardGoalsSummary(){ S.pendingGoalsSummary = null; document.getElementById('goals-summary-bar').classList.remove('show'); document.getElementById('goals-summary-st').className = ''; updatePendingBadge(); advanceCascade(); }
-function discardInsights()    { S.pendingInsights     = null; document.getElementById('insights-bar').classList.remove('show');      document.getElementById('insights-st').className      = ''; updatePendingBadge(); advanceCascade(); }
+function discardInsights()    { S.pendingInsights     = null; S._pendingThreads = null; document.getElementById('insights-bar').classList.remove('show');      document.getElementById('insights-st').className      = ''; updatePendingBadge(); advanceCascade(); }
 function discardPeople()      { S.pendingPeople       = null; document.getElementById('people-bar').classList.remove('show');        document.getElementById('people-st').className        = ''; updatePendingBadge(); advanceCascade(); }
 function discardPeopleNotes() { S.pendingPeopleNotes  = null; document.getElementById('people-notes-bar').classList.remove('show');  document.getElementById('people-notes-st').className  = ''; updatePendingBadge(); advanceCascade(); }
 function discardEvolution()   { S.pendingEvolution    = null; document.getElementById('evo-bar').classList.remove('show');           document.getElementById('evo-st').className           = ''; updatePendingBadge(); advanceCascade(); }
@@ -1916,14 +1948,19 @@ async function _saveAllPendingAndClear() {
     pendingEvolution:    'evolution',
     pendingReflections:  'reflections',
   };
+  let insightsSaved = false;
   results.forEach((r, i) => {
     if (r.status === 'fulfilled') {
+      if (jobs[i].field === 'pendingInsights') insightsSaved = true;
       S[jobs[i].field] = null;
     } else {
       failedNames.push(fieldLabels[jobs[i].field] || jobs[i].field);
       console.warn(`[save all pending] ${jobs[i].field} failed:`, r.reason?.message);
     }
   });
+  // If insights saved and a dependent thread is waiting, save it now.
+  // Thread is dropped if insights failed — it must not outpace its source note.
+  if (insightsSaved && S._pendingThreads) saveThreads();
 
   updatePendingBadge();
   if (failedNames.length > 0) {
@@ -2414,11 +2451,11 @@ async function sendMsg() {
     // Queue order (daily):  entry → patterns → goals-summary → insights → people → people-notes → evolution → reflections
     // Queue order (review): review → goals-summary → people-notes → people-profile
     // Queue notes if an entry/review bar is first; otherwise set pending and show immediately
-    // Threads are saved immediately as a fire-and-forget background write — no UI dependency.
-    // saveThreads() surfaces failure via addSys; silent success is fine.
-    // _pendingThreads is set first so saveThreads() has content, then cleared by saveThreads() itself.
-    // Threads do not appear in the pending badge — they save silently in the background.
-    if (threads) { S._pendingThreads = threads; saveThreads(); }
+    // Threads: if insights is also present in this response, threads are insights-dependent —
+    // do not save immediately. saveThreads() fires from saveInsights() on confirm.
+    // If insights is dismissed or discarded, _pendingThreads is cleared (thread is dropped).
+    // If no insights in this response, threads save immediately as before (fire-and-forget).
+    if (threads) { S._pendingThreads = threads; if (!insights) saveThreads(); }
     if (patterns)     { if (firstBar) S._queuedPatterns     = patterns;     else S.pendingPatterns     = patterns; }
     if (goalsSummary) { if (firstBar) S._queuedGoalsSummary = goalsSummary; else S.pendingGoalsSummary = goalsSummary; }
     if (insights)     { if (firstBar) S._queuedInsights     = insights;     else S.pendingInsights     = insights; }
@@ -3083,6 +3120,8 @@ function parsePeopleProfile(content) {
     const type         = block.match(/\btype:\s*(.+)/)?.[1]?.trim() || 'regular';
     const sessions     = parseInt(block.match(/sessions_mentioned:\s*(\d+)/)?.[1] || '0', 10);
     const lastMention  = block.match(/last_mentioned:\s*(\d{4}-\d{2}-\d{2})/)?.[1] || null;
+    // themes: legacy field — no longer written by the prompt. Defaults to [] when absent;
+    // render code guards on .length so missing themes produce no UI output.
     const themesMatch  = block.match(/themes:\s*\[(.+?)\]/);
     const themes       = themesMatch ? themesMatch[1].split(',').map(t => t.trim().replace(/['"]/g, '')) : [];
     if (name) people.push({ name, relationship, type, sessions_mentioned: sessions, last_mentioned: lastMention, themes });
