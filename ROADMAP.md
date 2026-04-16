@@ -1,6 +1,6 @@
 # miles-archive — Roadmap
 
-*Last updated: 2026-04-07*
+*Last updated: 2026-04-16*
 
 → Project overview and self-hosting: [README.md](README.md)
 → Implementation context for development: [CLAUDE.md](CLAUDE.md)
@@ -53,3 +53,5 @@ This file tracks feature status and planned work. Update it when features ship, 
 - [x] **Reverse-chronological notes ordering** — all notes files prepend newest entries first; `mergeReflectionsUpdate()` and chat-insights prompts updated to match *(Apr 6, 2026)*
 - [x] **Prompt caching + memoization** — `getSysPrompt()` wraps `buildSysPrompt()`; `S._cachedSysPrompt` built once per session; invalidated on state/patterns/goals/insights saves; `sendMsg` max_tokens raised to 4096; `S._deepContext` for ephemeral deep-fetch injection *(Apr 7, 2026)*
 - [x] **fetchDeep window narrowed** — 4–14 → 4–10 days *(Apr 7, 2026)*
+- [x] **Session memory compression** — drop zone / pinned message architecture; `_midSessionSummary` built incrementally and injected into every subsequent API call; `_compressing` guard prevents concurrent jobs *(Apr 2026)*
+- [x] **Save bar UX refactor** — Later/Discard split (Later retains pending state, Discard clears); pending badge on nav shows count of retained note updates; notes-bar removed *(Apr 2026)*

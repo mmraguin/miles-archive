@@ -1,6 +1,6 @@
 # miles-archive — Claude Code Reference
 
-*Last updated: 2026-04-13*
+*Last updated: 2026-04-16*
 
 → Project overview and self-hosting: [README.md](README.md)
 → Feature status and planned work: [ROADMAP.md](ROADMAP.md)
@@ -62,7 +62,7 @@ No hardcoded keys. Stored in `localStorage`:
 `getSysPrompt()` memoizes `buildSysPrompt()` in `S._cachedSysPrompt`. Sections joined with `\n\n`, filtered for truthiness:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → threadsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → sessionOpeners → fetchDeep → coaching → reviewOverdue → briefMode → reflectionElicitation → graymatter → protocol → output → voice → stateUpdate → patternsUpdate → goalsSummaryUpdate → chatInsightsUpdate → threadsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionsUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → threadsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → sessionOpeners → fetchDeep → coaching → reviewOverdue → briefMode → reflectionElicitation → graymatter → protocol → output → voice → writePreamble → stateUpdate → goalsSummaryUpdate → chatInsightsUpdate → threadsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionsUpdate → misc
 ```
 
 Non-obvious notes:
@@ -75,7 +75,7 @@ Non-obvious notes:
 
 **File distinctions:**
 - `patterns.md` = what the *data* shows — behavioral/health correlations confirmed across journal entries and Garmin data. Answers: *what does the record show?* Sections: HEALTH, BEHAVIORAL, EMOTIONAL only. No GOALS section — goal status tracking belongs in `goals-summary.md`.
-- `chat-insights.md` = what *conversations* added — mechanisms explained, reframes that shifted something, distinctions named in a way that landed differently. Answers: *what did the chat surface that the journal alone didn't?* Entry test: if you remove the interface's contribution and the entry still reads like a journal summary, it does not belong here. Entry structure: `**Date surfaced** / **Source context** / ### What the interface surfaced / ### Why this matters / ### Suggested follow-up`. Newest entries first within each thematic section.
+- `chat-insights.md` = what *conversations* added — mechanisms explained, reframes that shifted something, distinctions named in a way that landed differently. Answers: *what did the chat surface that the journal alone didn't?* Entry test: if you remove the interface's contribution and the entry still reads like a journal summary, it does not belong here. Entry structure: `**[[YYYY-MM-DD]]** / **What got clearer:** [one plain sentence] / Context: [2–5 lines] / Next move: [only if real handoff needed]`. Newest entries first within each thematic section.
 - `threads.md` = operational pointer index, not a knowledge note. No interpretation — source link carries the context. Three sections: Open (has `next_step` + `owner`), Watch (has `next_check`, no action confirmed), Closed (has `resolution`). Entries newest-first within Open. Tagged `[pattern]` or `[insight]`; auto-saved silently after insights bar confirms.
 
 **Operating rule:** Capture once. Summarize once. Reference elsewhere. Do not re-explain the same detail across multiple files. The biggest source of system clutter is over-promotion: one meaningful moment turning into a reflection, an insight, a pattern, a people note, and a thread simultaneously.
