@@ -1,6 +1,6 @@
 # miles-archive — Roadmap
 
-*Last updated: 2026-04-16*
+*Last updated: 2026-04-17*
 
 → Project overview and self-hosting: [README.md](README.md)
 → Implementation context for development: [CLAUDE.md](CLAUDE.md)
@@ -44,7 +44,7 @@ This file tracks feature status and planned work. Update it when features ship, 
 - [x] **Dashboard tone** — Co-Star voice rules applied to Haiku prompt *(Apr 5, 2026)*
 - [x] **People Notes** — `notes/people-notes.md` with markers, save bar (rose accent), context injection *(Apr 5, 2026)*
 - [x] **Goals summary maintenance** — `notes/goals-summary.md` write path via markers; conservative daily trigger; always fires in review mode *(Apr 5, 2026)*
-- [x] **Review Mode** — separate system prompt; `<<<REVIEW_START>>>` / `<<<REVIEW_END>>>` markers; incomplete entry detection and merge; cascade `review → goals-summary → people → people-notes` *(Apr 5, 2026)*
+- [x] **Review Mode** — separate system prompt; `<<<REVIEW_START>>>` / `<<<REVIEW_END>>>` markers; incomplete entry detection and merge; cascade `review → goals-summary → people-notes → people` *(Apr 5, 2026)*
 - [x] **Evolution optimization** — draws from patterns + people-notes + state-of-miles; post-review suggestion when 90+ days since last entry *(Apr 5, 2026)*
 - [x] **Auto-update patterns.md** — `triggerPostEntryReview()` fires after every entry/review save; merge-mode output; silent fail; user confirms *(Apr 5, 2026)*
 - [x] **System prompt + data file audit** — anchor integrity, section naming fixes, trajectory markers, contradiction trigger, data files repaired *(Apr 5, 2026)*
@@ -55,3 +55,4 @@ This file tracks feature status and planned work. Update it when features ship, 
 - [x] **fetchDeep window narrowed** — 4–14 → 4–10 days *(Apr 7, 2026)*
 - [x] **Session memory compression** — drop zone / pinned message architecture; `_midSessionSummary` built incrementally and injected into every subsequent API call; `_compressing` guard prevents concurrent jobs *(Apr 2026)*
 - [x] **Save bar UX refactor** — Later/Discard split (Later retains pending state, Discard clears); pending badge on nav shows count of retained note updates; notes-bar removed *(Apr 2026)*
+- [x] **Lessons file** — `notes/lessons.md` write path via markers (`<<<LESSONS_START>>>` / `<<<LESSONS_END>>>`); `lessonsContext` injection + `lessonsUpdate` output (suppressed in brief and review mode); save bar after insights in daily cascade; strict qualification criteria + anti-duplication preflight; manual editing also supported *(Apr 17, 2026)*

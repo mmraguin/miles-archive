@@ -72,6 +72,19 @@
     </div>
   </div>
 
+  <div id="lessons-bar">
+    <div id="lessons-top">
+      <span id="lessons-lbl">Lessons update</span>
+      <span id="lessons-path">notes/lessons.md</span>
+    </div>
+    <div id="lessons-row">
+      <button id="lessons-go" onclick="saveLessons()">Save to GitHub →</button>
+      <button id="lessons-no" onclick="dismissLessons()">Later</button>
+      <button class="bar-discard" onclick="discardLessons()">discard</button>
+      <span id="lessons-st"></span>
+    </div>
+  </div>
+
   <div id="state-bar">
     <div id="state-top">
       <span id="state-lbl">State doc update</span>

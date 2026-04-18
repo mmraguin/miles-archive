@@ -1,6 +1,6 @@
 # miles-archive — Claude Code Reference
 
-*Last updated: 2026-04-16*
+*Last updated: 2026-04-17*
 
 → Project overview and self-hosting: [README.md](README.md)
 → Feature status and planned work: [ROADMAP.md](ROADMAP.md)
@@ -41,7 +41,7 @@ No hardcoded keys. Stored in `localStorage`:
 
 **Max tokens:** `2500` default in `callClaude()` (optional 4th param). Main `sendMsg` passes `4096`. Post-entry review uses `3500`.
 
-**System prompt memoization:** `getSysPrompt()` wraps `buildSysPrompt()` — builds once per session, stored in `S._cachedSysPrompt`. Invalidated when state.md, patterns.md, goals-summary.md, chat-insights.md, or threads.md are saved mid-session. Cleared on session reset.
+**System prompt memoization:** `getSysPrompt()` wraps `buildSysPrompt()` — builds once per session, stored in `S._cachedSysPrompt`. Invalidated when state.md, patterns.md, goals-summary.md, chat-insights.md, lessons.md, or threads.md are saved mid-session. Cleared on session reset.
 
 **Timezone:** All date logic uses `Asia/Manila` via `Intl.DateTimeFormat`. Never use `Date()` offsets.
 
@@ -62,7 +62,7 @@ No hardcoded keys. Stored in `localStorage`:
 `getSysPrompt()` memoizes `buildSysPrompt()` in `S._cachedSysPrompt`. Sections joined with `\n\n`, filtered for truthiness:
 
 ```
-identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → threadsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → sessionOpeners → fetchDeep → coaching → reviewOverdue → briefMode → reflectionElicitation → graymatter → protocol → output → voice → writePreamble → stateUpdate → goalsSummaryUpdate → chatInsightsUpdate → threadsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionsUpdate → misc
+identity → context → stateDoc → goalsContext → patternsContext → chatInsightsContext → lessonsContext → threadsContext → peopleNotesContext → peopleContext → recentContext → graymatterTrend → reflectionTrend → trendAwareness → sessionOpeners → fetchDeep → coaching → reviewOverdue → briefMode → reflectionElicitation → graymatter → protocol → output → voice → writePreamble → stateUpdate → goalsSummaryUpdate → chatInsightsUpdate → lessonsUpdate → threadsUpdate → peopleNotesUpdate → peopleUpdate → evolutionUpdate → reflectionsUpdate → misc
 ```
 
 Non-obvious notes:
@@ -71,10 +71,12 @@ Non-obvious notes:
 - `fetchDeep` fires once per session (`deepFetched` guard); result stored in `S._deepContext`, appended to next outgoing message then cleared
 - `briefMode` section only present when `S.brief === true`
 - `evolutionUpdate` only injected when 90+ days since last entry (or none exists) and 7+ days since last offered
+- `lessonsUpdate` suppressed when `S.brief === true` OR `S.reviewMode === true` — lessons do not emit in review sessions
 - `threadsUpdate` outputs `<<<THREADS_START>>>` / `<<<THREADS_END>>>` markers; threads.md is auto-saved silently after insights bar confirms — no separate save bar
 
 **File distinctions:**
 - `patterns.md` = what the *data* shows — behavioral/health correlations confirmed across journal entries and Garmin data. Answers: *what does the record show?* Sections: HEALTH, BEHAVIORAL, EMOTIONAL only. No GOALS section — goal status tracking belongs in `goals-summary.md`.
+- `lessons.md` = crystallized personal convictions I now hold and operate by. Source: introspection, people, experience, conversation. Entry test: would this be referred to before a decision, or used to call something out? Entry structure: bold conviction statement, 1–2 lines of context only if needed, `[[YYYY-MM-DD]]`. Thematic sections emerge as entries are added; cross-thematic entries filed under primary theme with secondary themes in italics. Newest entries first within each section. Distinct from `chat-insights.md` (interface-surfaced) and `patterns.md` (data-observed).
 - `chat-insights.md` = what *conversations* added — mechanisms explained, reframes that shifted something, distinctions named in a way that landed differently. Answers: *what did the chat surface that the journal alone didn't?* Entry test: if you remove the interface's contribution and the entry still reads like a journal summary, it does not belong here. Entry structure: `**[[YYYY-MM-DD]]** / **What got clearer:** [one plain sentence] / Context: [2–5 lines] / Next move: [only if real handoff needed]`. Newest entries first within each thematic section.
 - `threads.md` = operational pointer index, not a knowledge note. No interpretation — source link carries the context. Three sections: Open (has `next_step` + `owner`), Watch (has `next_check`, no action confirmed), Closed (has `resolution`). Entries newest-first within Open. Tagged `[pattern]` or `[insight]`; auto-saved silently after insights bar confirms.
 
@@ -83,6 +85,7 @@ Non-obvious notes:
 **Promotion criteria — write to a file only if the detail qualifies:**
 - → `reflections`: one of the day's most worth-remembering moments
 - → `chat-insights`: the interface added understanding not already explicit in the journal; entry test must pass
+- → `lessons`: a conviction has crystallized to the point where it would be acted on or referred to; not still emerging
 - → `patterns`: repeated enough, or high enough impact, to warrant ongoing attention
 - → `state-of-miles`: medically current and data-backed; narrative-only mentions do not qualify
 - → `people-profile`: person is recurring enough to deserve a stable entry
@@ -95,7 +98,7 @@ Non-obvious notes:
 
 ## Save Bar Chain
 
-**Daily:** `entry → patterns → goals-summary → insights → people → people-notes → evolution → reflections`
+**Daily:** `entry → patterns → goals-summary → insights → lessons → people → people-notes → evolution → reflections`
 **Review:** `review → goals-summary → people-notes → people-profile`
 
 Each bar queued via `S._queued*`. After entry/review saves, `triggerPostEntryReview()` fires in background — if it produces a patterns update not already in the queue, pat-bar appends after cascade completes.

@@ -552,6 +552,45 @@ body::before {
 #insights-st.err  { color: var(--error); }
 #insights-st.info { color: var(--text-2); }
 
+/* ── Lessons bar ── */
+#lessons-bar {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  flex-shrink: 0;
+}
+#lessons-bar.show { display: flex; }
+
+#lessons-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#lessons-lbl { font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 500; color: #d4a96a; flex-shrink: 0; }
+#lessons-path { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; color: var(--text-3); text-align: right; word-break: break-all; flex: 1; }
+#lessons-row  { display: flex; align-items: center; gap: 14px; }
+
+#lessons-go {
+  background: none; border: 1px solid #d4a96a; cursor: pointer;
+  font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 500;
+  color: #d4a96a; padding: 9px 22px; border-radius: 0;
+  transition: opacity 0.18s; line-height: 1;
+}
+#lessons-go:hover    { opacity: 0.82; }
+#lessons-go:disabled { opacity: 0.2; cursor: not-allowed; }
+
+#lessons-no {
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300;
+  color: var(--text-3); padding: 0;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  transition: color 0.18s;
+}
+#lessons-no:hover { color: var(--text-2); }
+
+#lessons-st { font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 300; letter-spacing: 0.04em; display: none; }
+#lessons-st.show { display: block; }
+#lessons-st.ok   { color: var(--success); }
+#lessons-st.err  { color: var(--error); }
+#lessons-st.info { color: var(--text-2); }
+
 /* ── State bar ── */
 #state-bar {
   display: none; flex-direction: column; gap: 10px;
@@ -1310,7 +1349,7 @@ body::before {
 /* ── Oracle overrides ─────────────────────────────────────────────────────── */
 
 /* All save / action bars: glass treatment */
-#pat-bar, #goals-summary-bar, #insights-bar, #state-bar,
+#pat-bar, #goals-summary-bar, #insights-bar, #lessons-bar, #state-bar,
 #people-bar, #people-notes-bar, #evo-bar, #reflections-bar,
 #review-bar, #save-bar {
   background: rgba(10,10,10,0.88) !important;
@@ -1320,7 +1359,7 @@ body::before {
 }
 
 /* Save bar labels → Space Mono */
-#pat-lbl, #goals-summary-lbl, #insights-lbl, #state-lbl,
+#pat-lbl, #goals-summary-lbl, #insights-lbl, #lessons-lbl, #state-lbl,
 #people-lbl, #people-notes-lbl, #evo-lbl, #reflections-lbl,
 #review-lbl, #save-lbl {
   font-family: 'Space Mono', monospace;
@@ -1331,7 +1370,7 @@ body::before {
 }
 
 /* Save bar path labels → Space Mono */
-#pat-path, #goals-summary-path, #insights-path, #state-path,
+#pat-path, #goals-summary-path, #insights-path, #lessons-path, #state-path,
 #people-path, #people-notes-path, #evo-path, #reflections-path,
 #review-path, #save-path {
   font-family: 'Space Mono', monospace;
@@ -1340,7 +1379,7 @@ body::before {
 }
 
 /* Save bar confirm buttons → Space Mono */
-#pat-go, #goals-summary-go, #insights-go, #state-go,
+#pat-go, #goals-summary-go, #insights-go, #lessons-go, #state-go,
 #people-go, #people-notes-go, #evo-go, #reflections-go,
 #review-go, #save-go {
   font-family: 'Space Mono', monospace !important;
@@ -1351,7 +1390,7 @@ body::before {
 }
 
 /* Save bar dismiss (Later) buttons → Space Mono */
-#pat-no, #goals-summary-no, #insights-no, #state-no,
+#pat-no, #goals-summary-no, #insights-no, #lessons-no, #state-no,
 #people-no, #people-notes-no, #evo-no, #reflections-no,
 #review-no, #save-no, .bar-discard {
   font-family: 'Space Mono', monospace;

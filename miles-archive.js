@@ -32,6 +32,9 @@ const S = {
   chatInsights:       null,  // fetched from notes/chat-insights.md
   pendingInsights:    null,  // insights update pending save
   _queuedInsights:    null,  // insights queued to show after goals-summary bar clears
+  lessons:            null,  // fetched from notes/lessons.md
+  pendingLessons:     null,  // lessons update pending save
+  _queuedLessons:     null,  // lessons queued to show after insights bar clears
   peopleProfile:      null,  // fetched from notes/people-profile.md
   pendingPeople:      null,  // people profile update pending save
   peopleNotes:        null,  // fetched from notes/people-notes.md
@@ -164,6 +167,13 @@ You understand bodies, health, mental health, habits, and how people get stuck. 
   // chat-insights.md = what conversations added: things that clicked, distinctions made, mechanisms named — not already obvious from the journal.
   const chatInsightsContext = S.chatInsights
     ? `CHAT INSIGHTS\nThe following notes are reference data only. Use their facts and continuity. Do not copy or match their prose style when writing new entries.\n${S.chatInsights}\n\nThings the conversation made clearer that the journal alone didn't capture — use as background, don't reference the doc explicitly.`
+    : '';
+
+  // ── Section: Lessons (fetched from notes/lessons.md)
+  // lessons.md = crystallized convictions stable enough to use in decisions. Distinct from
+  // chat-insights (interface-surfaced) and patterns (data-observed).
+  const lessonsContext = S.lessons
+    ? `LESSONS\nThe following notes are reference data only. Use their facts and continuity. Do not copy or match their prose style when writing new entries.\n${S.lessons}\n\nCrystallized convictions Miles now holds and operates by. Use as background context — don't reference the doc explicitly.`
     : '';
 
   // ── Section: Return threads (fetched from notes/threads.md)
@@ -592,6 +602,54 @@ Rules:
 - Only open a thread if this clearly creates a real unresolved item needing tracking — do not auto-promote
 - DO NOT update: behavioral patterns (patterns.md), clinical flags (state-of-miles.md), passing comments, session summaries`;
 
+  // ── Section: Lessons update instructions (suppressed in brief mode and review mode)
+  const lessonsUpdate = (S.brief || S.reviewMode) ? '' : `LESSONS UPDATES
+notes/lessons.md records crystallized convictions — things Miles now holds and operates by. Distinct from chat-insights (interface-surfaced) and patterns (data-observed).
+
+A lesson qualifies only when ALL of these are true:
+- The point feels stable, not newly emotional or freshly named in this conversation
+- It would actually change a decision, boundary, interpretation, or standard
+- It is phrased as something Miles now holds — not still exploring
+- It is distinct from a pattern, recap, or interface-generated reframe
+- Miles would plausibly quote it to herself before a real choice
+
+Do not write a lesson when:
+- It is only newly named in this conversation
+- It is still being tested or emotionally raw
+- It is a one-off reaction to one person or one event
+- It belongs more naturally in chat-insights, patterns, or people-notes
+
+Anti-duplication preflight (run silently before emitting):
+1. Is this a conviction, or just a good insight? If both could apply, prefer chat-insights and omit the lesson unless the conviction is clearly settled.
+2. If this response also produces a chat-insight covering the same idea, do not emit a lesson unless the lesson is clearly more stable, broader, and decision-level than the insight. When in doubt: emit chat-insights for what the interface surfaced; emit lessons only for what has already settled into conviction. If you cannot tell the difference, omit the lesson.
+3. If this sounds like a very good note rather than a conviction Miles would actually use, omit it.
+
+Prefer zero lessons over a weak one. Prefer one strong lesson over several adjacent ones.
+
+Entry format:
+**[Bold conviction statement]**
+[Optional 1–2 lines of context — only if the statement alone would lose meaning]
+[[${date}]]
+
+Section rules:
+- Reuse an existing ## section if the theme fits
+- Create a new section only if the theme is likely to recur
+- Do not create near-duplicate section names
+- Newest entries first within each section
+- Update the *Last updated* date
+
+Output the full updated file wrapped in markers only when a lesson clearly qualifies:
+
+<<<LESSONS_START>>>
+# Lessons
+
+*Last updated: [[${date}]]*
+
+[full file content — all existing entries preserved, new entry prepended at top of correct section]
+<<<LESSONS_END>>>
+
+Do not emit if no lesson qualifies. Silence is correct.`;
+
   // ── Section: People notes context (not injected in brief mode)
   const peopleNotesContext = (!S.brief && S.peopleNotes)
     ? `PEOPLE NOTES\nThe following notes are reference data only. Use their facts and continuity. Do not copy or match their prose style when writing new entries.\n${S.peopleNotes}\n\nRunning record of significant recurring people. Who they are, what keeps being true, what changed. Not narrative writing. Don't reference the doc explicitly.`
@@ -810,7 +868,7 @@ Always emit this block after every daily entry — it is not optional.`;
   const misc = `LANGUAGE: Follow Miles — English, Tagalog, French. Switch naturally mid-conversation without comment.
 NOTABILITY: When Miles pastes raw OCR text, clean it preserving her voice exactly. Ask where it goes if unclear.`;
 
-  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, threadsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, writePreamble, stateUpdate, goalsSummaryUpdate, chatInsightsUpdate, threadsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
+  return [identity, context, stateDoc, goalsContext, patternsContext, chatInsightsContext, lessonsContext, threadsContext, peopleNotesContext, peopleContext, recentContext, graymatterTrend, reflectionTrend, trendAwareness, sessionOpeners, fetchDeep, coaching, reviewOverdue, briefMode, reflectionElicitation, graymatter, protocol, output, voice, writePreamble, stateUpdate, goalsSummaryUpdate, chatInsightsUpdate, lessonsUpdate, threadsUpdate, peopleNotesUpdate, peopleUpdate, evolutionUpdate, reflectionsUpdate, misc]
     .filter(Boolean)
     .join('\n\n');
 }
@@ -1529,6 +1587,13 @@ function extractChatInsights(txt) {
   return txt.slice(s + 25, e).trim();
 }
 
+function extractLessons(txt) {
+  const s = txt.indexOf('<<<LESSONS_START>>>');
+  const e = txt.indexOf('<<<LESSONS_END>>>');
+  if (s === -1 || e === -1) return null;
+  return txt.slice(s + 19, e).trim();
+}
+
 function extractThreads(txt) {
   const s = txt.indexOf('<<<THREADS_START>>>');
   const e = txt.indexOf('<<<THREADS_END>>>');
@@ -1620,13 +1685,14 @@ async function githubPut(path, content, commitMessage, existingSha) {
 
 // ── Save bar cascade ──────────────────────────────────────────────────────────
 // Advances to the next queued save bar after one is saved or dismissed.
-// Daily order:  patterns → goals-summary → insights → people → people-notes → evolution → reflections
+// Daily order:  patterns → goals-summary → insights → lessons → people → people-notes → evolution → reflections
 // Review order: goals-summary → people-notes → people
 function advanceCascade() {
   const daily = [
     ['_queuedPatterns',     showPatBar],
     ['_queuedGoalsSummary', showGoalsSummaryBar],
     ['_queuedInsights',     showInsightsBar],
+    ['_queuedLessons',      showLessonsBar],
     ['_queuedPeople',       showPeopleBar],
     ['_queuedPeopleNotes',  showPeopleNotesBar],
     ['_queuedEvolution',    showEvoBar],
@@ -1859,6 +1925,51 @@ async function saveInsights() {
   }
 }
 
+// ── Lessons save ─────────────────────────────────────────────────────────────
+function setLessonsSt(type, txt) {
+  const e = document.getElementById('lessons-st');
+  e.className = `show ${type}`; e.textContent = txt;
+}
+
+function showLessonsBar(content) {
+  S.pendingLessons = content;
+  document.getElementById('lessons-go').disabled = false;
+  document.getElementById('lessons-st').className = '';
+  document.getElementById('lessons-bar').classList.add('show');
+}
+
+function dismissLessons() {
+  // S.pendingLessons retained — user can recover via pending badge
+  document.getElementById('lessons-bar').classList.remove('show');
+  document.getElementById('lessons-st').className = '';
+  updatePendingBadge();
+  advanceCascade();
+}
+
+async function saveLessons() {
+  if (!S.pendingLessons) return;
+  const btn = document.getElementById('lessons-go');
+  btn.disabled = true;
+  setLessonsSt('info', 'writing…');
+  try {
+    await githubPut('notes/lessons.md', S.pendingLessons, 'lessons: update notes/lessons.md');
+    S.lessons = S.pendingLessons;
+    S._cachedSysPrompt = null;
+    setLessonsSt('ok', 'saved');
+    addSys('lessons updated → notes/lessons.md');
+    S.pendingLessons = null;
+    setTimeout(() => {
+      document.getElementById('lessons-bar').classList.remove('show');
+      document.getElementById('lessons-st').className = '';
+      updatePendingBadge();
+      advanceCascade();
+    }, 2400);
+  } catch(err) {
+    setLessonsSt('err', friendlyError(err));
+    btn.disabled = false;
+  }
+}
+
 // ── Threads auto-save (silent, fire-and-forget) ───────────────────────────────
 async function saveThreads() {
   if (!S._pendingThreads) return;
@@ -1879,7 +1990,7 @@ async function saveThreads() {
 function updatePendingBadge() {
   const count = [
     S.pendingPatterns, S.pendingGoalsSummary, S.pendingInsights,
-    S.pendingPeople, S.pendingPeopleNotes, S.pendingEvolution, S.pendingReflections,
+    S.pendingLessons, S.pendingPeople, S.pendingPeopleNotes, S.pendingEvolution, S.pendingReflections,
   ].filter(Boolean).length;
   const badge = document.getElementById('pending-badge');
   if (!badge) return;
@@ -1898,6 +2009,7 @@ function openPendingQueue() {
     [S.pendingPatterns,     showPatBar],
     [S.pendingGoalsSummary, showGoalsSummaryBar],
     [S.pendingInsights,     showInsightsBar],
+    [S.pendingLessons,      showLessonsBar],
     [S.pendingPeople,       showPeopleBar],
     [S.pendingPeopleNotes,  showPeopleNotesBar],
     [S.pendingEvolution,    showEvoBar],
@@ -1912,6 +2024,7 @@ function openPendingQueue() {
 function discardPatterns()    { S.pendingPatterns     = null; document.getElementById('pat-bar').classList.remove('show');          document.getElementById('pat-st').className          = ''; updatePendingBadge(); advanceCascade(); }
 function discardGoalsSummary(){ S.pendingGoalsSummary = null; document.getElementById('goals-summary-bar').classList.remove('show'); document.getElementById('goals-summary-st').className = ''; updatePendingBadge(); advanceCascade(); }
 function discardInsights()    { S.pendingInsights     = null; S._pendingThreads = null; document.getElementById('insights-bar').classList.remove('show');      document.getElementById('insights-st').className      = ''; updatePendingBadge(); advanceCascade(); }
+function discardLessons()     { S.pendingLessons      = null; document.getElementById('lessons-bar').classList.remove('show');       document.getElementById('lessons-st').className       = ''; updatePendingBadge(); advanceCascade(); }
 function discardPeople()      { S.pendingPeople       = null; document.getElementById('people-bar').classList.remove('show');        document.getElementById('people-st').className        = ''; updatePendingBadge(); advanceCascade(); }
 function discardPeopleNotes() { S.pendingPeopleNotes  = null; document.getElementById('people-notes-bar').classList.remove('show');  document.getElementById('people-notes-st').className  = ''; updatePendingBadge(); advanceCascade(); }
 function discardEvolution()   { S.pendingEvolution    = null; document.getElementById('evo-bar').classList.remove('show');           document.getElementById('evo-st').className           = ''; updatePendingBadge(); advanceCascade(); }
@@ -1926,6 +2039,7 @@ async function _saveAllPendingAndClear() {
   if (S.pendingPatterns)     jobs.push({ field: 'pendingPatterns',     p: githubPut('notes/patterns.md',       S.pendingPatterns,     'patterns: update notes/patterns.md') });
   if (S.pendingGoalsSummary) jobs.push({ field: 'pendingGoalsSummary', p: githubPut('notes/goals-summary.md',  S.pendingGoalsSummary, 'goals-summary: update notes/goals-summary.md') });
   if (S.pendingInsights)     jobs.push({ field: 'pendingInsights',     p: githubPut('notes/chat-insights.md',  S.pendingInsights,     'insights: update notes/chat-insights.md') });
+  if (S.pendingLessons)      jobs.push({ field: 'pendingLessons',      p: githubPut('notes/lessons.md',        S.pendingLessons,      'lessons: update notes/lessons.md') });
   if (S.pendingPeople)       jobs.push({ field: 'pendingPeople',       p: githubPut('notes/people-profile.md', S.pendingPeople,       'people: update notes/people-profile.md') });
   if (S.pendingPeopleNotes)  jobs.push({ field: 'pendingPeopleNotes',  p: githubPut('notes/people-notes.md',   S.pendingPeopleNotes,  'people-notes: update notes/people-notes.md') });
   if (S.pendingEvolution)    jobs.push({ field: 'pendingEvolution',    p: githubPut('notes/evolution.md',      S.pendingEvolution,    'evolution: update notes/evolution.md') });
@@ -1943,6 +2057,7 @@ async function _saveAllPendingAndClear() {
     pendingPatterns:     'patterns',
     pendingGoalsSummary: 'goals summary',
     pendingInsights:     'insights',
+    pendingLessons:      'lessons',
     pendingPeople:       'people profile',
     pendingPeopleNotes:  'people notes',
     pendingEvolution:    'evolution',
@@ -1976,7 +2091,7 @@ function _pendingClearPrompt() {
   if (existing) existing.remove();
   const count = [
     S.pendingPatterns, S.pendingGoalsSummary, S.pendingInsights,
-    S.pendingPeople, S.pendingPeopleNotes, S.pendingEvolution, S.pendingReflections,
+    S.pendingLessons, S.pendingPeople, S.pendingPeopleNotes, S.pendingEvolution, S.pendingReflections,
   ].filter(Boolean).length;
   const bar = document.createElement('div');
   bar.id = 'inline-confirm';
@@ -2422,6 +2537,7 @@ async function sendMsg() {
     const patterns     = extractPatterns(reply);
     const goalsSummary = extractGoalsSummary(reply);
     const insights     = extractChatInsights(reply);
+    const lessonsNew   = extractLessons(reply);
     const threads      = extractThreads(reply);
     const people       = extractPeople(reply);
     const peopleNotes  = extractPeopleNotes(reply);
@@ -2436,6 +2552,7 @@ async function sendMsg() {
     if (patterns)     disp = disp.replace(/<<<PATTERNS_START>>>[\s\S]*?<<<PATTERNS_END>>>/g, '').trim();
     if (goalsSummary) disp = disp.replace(/<<<GOALS_SUMMARY_START>>>[\s\S]*?<<<GOALS_SUMMARY_END>>>/g, '').trim();
     if (insights)     disp = disp.replace(/<<<CHAT_INSIGHTS_START>>>[\s\S]*?<<<CHAT_INSIGHTS_END>>>/g, '').trim();
+    if (lessonsNew)   disp = disp.replace(/<<<LESSONS_START>>>[\s\S]*?<<<LESSONS_END>>>/g, '').trim();
     if (threads)      disp = disp.replace(/<<<THREADS_START>>>[\s\S]*?<<<THREADS_END>>>/g, '').trim();
     if (people)       disp = disp.replace(/<<<PEOPLE_START>>>[\s\S]*?<<<PEOPLE_END>>>/g, '').trim();
     if (peopleNotes)  disp = disp.replace(/<<<PEOPLE_NOTES_START>>>[\s\S]*?<<<PEOPLE_NOTES_END>>>/g, '').trim();
@@ -2459,6 +2576,7 @@ async function sendMsg() {
     if (patterns)     { if (firstBar) S._queuedPatterns     = patterns;     else S.pendingPatterns     = patterns; }
     if (goalsSummary) { if (firstBar) S._queuedGoalsSummary = goalsSummary; else S.pendingGoalsSummary = goalsSummary; }
     if (insights)     { if (firstBar) S._queuedInsights     = insights;     else S.pendingInsights     = insights; }
+    if (lessonsNew)   { if (firstBar) S._queuedLessons      = lessonsNew;   else S.pendingLessons      = lessonsNew; }
     if (people)       { if (firstBar) S._queuedPeople       = people;       else S.pendingPeople       = people; }
     if (peopleNotes)  { if (firstBar) S._queuedPeopleNotes  = peopleNotes;  else S.pendingPeopleNotes  = peopleNotes; }
     if (evolution)    { if (firstBar) S._queuedEvolution    = evolution;    else S.pendingEvolution    = evolution; }
@@ -2492,7 +2610,7 @@ async function sendMsg() {
 // ── New session ───────────────────────────────────────────────────────────────
 function newSess() {
   const hasPending = S.pendingPatterns || S.pendingGoalsSummary || S.pendingInsights ||
-    S.pendingPeople || S.pendingPeopleNotes || S.pendingEvolution || S.pendingReflections;
+    S.pendingLessons || S.pendingPeople || S.pendingPeopleNotes || S.pendingEvolution || S.pendingReflections;
   if (hasPending) {
     _pendingClearPrompt();
     return;
@@ -2509,6 +2627,7 @@ function _clearAndStart() {
   S.brief = false; S.existingEntry = null; S.recentEntries = []; S.stateOfMiles = null;
   S.goals = null; S.patterns = null; S.pendingPatterns = null;
   S.chatInsights = null; S.pendingInsights = null; S._queuedInsights = null;
+  S.lessons = null; S.pendingLessons = null; S._queuedLessons = null;
   S.pendingGoalsSummary = null; S._queuedGoalsSummary = null;
   S.deepFetched = false; S._queuedPatterns = null;
   S.peopleProfile = null; S.pendingPeople = null; S._queuedPeople = null;
@@ -2524,6 +2643,8 @@ function _clearAndStart() {
   document.getElementById('goals-summary-st').className = '';
   document.getElementById('insights-bar').classList.remove('show');
   document.getElementById('insights-st').className = '';
+  document.getElementById('lessons-bar').classList.remove('show');
+  document.getElementById('lessons-st').className = '';
   document.getElementById('state-bar').classList.remove('show');
   document.getElementById('state-st').className = '';
   document.getElementById('people-bar').classList.remove('show');
@@ -2610,6 +2731,7 @@ function fetchGoals()         { return fetchEntry('notes/goals-summary.md'); }
 function fetchGoalsFull()     { return fetchEntry('goals/current.md'); }
 function fetchPatterns()      { return fetchEntry('notes/patterns.md'); }
 function fetchChatInsights()  { return fetchEntry('notes/chat-insights.md'); }
+function fetchLessons()       { return fetchEntry('notes/lessons.md'); }
 function fetchThreads()       { return fetchEntry('notes/threads.md'); }
 function fetchPeopleProfile() { return fetchEntry('notes/people-profile.md'); }
 function fetchPeopleNotes()   { return fetchEntry('notes/people-notes.md'); }
@@ -2789,12 +2911,13 @@ function buildGraymatterTrend(entries) {
 // ── Load session context — used at start + on draft restore ──────────────────
 async function loadSessionContext() {
   const lockFired = S.sessionDate !== todayManila();
-  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
+  const [recentEntries, stateOfMiles, goals, patterns, chatInsights, lessons, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchRecentEntries(lockFired ? 4 : 3),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
     fetchChatInsights(),
+    fetchLessons(),
     fetchPeopleProfile(),
     fetchPeopleNotes(),
     fetchEvolution(),
@@ -2805,6 +2928,7 @@ async function loadSessionContext() {
   S.goals         = goals;
   S.patterns      = patterns;
   S.chatInsights  = chatInsights;
+  S.lessons       = lessons;
   S.peopleProfile = peopleProfile;
   S.peopleNotes   = peopleNotes;
   S.evolution     = evolution;
@@ -2829,13 +2953,14 @@ async function startSess() {
 
   // Fetch today's entry + recent days + state doc + goals + patterns + chat insights + people + evolution + review log in parallel
   // When date lock fired, fetch 4 days back — today's slot is empty by definition, so pull an extra day for context
-  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, threads, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
+  const [existing, recentEntries, stateOfMiles, goals, patterns, chatInsights, lessons, threads, peopleProfile, peopleNotes, evolution, reviewLog] = await Promise.all([
     fetchTodayEntry(),
     fetchRecentEntries(lockFired ? 4 : 3),
     fetchStateOfMiles(),
     fetchGoals(),
     fetchPatterns(),
     fetchChatInsights(),
+    fetchLessons(),
     fetchThreads(),
     fetchPeopleProfile(),
     fetchPeopleNotes(),
@@ -2848,6 +2973,7 @@ async function startSess() {
   S.goals          = goals;
   S.patterns       = patterns;
   S.chatInsights   = chatInsights;
+  S.lessons        = lessons;
   S.threads        = threads;
   S.peopleProfile  = peopleProfile;
   S.peopleNotes    = peopleNotes;
@@ -2926,7 +3052,7 @@ function restoreDraft(draft) {
     if (m.role === 'user') {
       addMsg('user', m.content);
     } else if (m.role === 'assistant') {
-      const markerRe = /<<<(ENTRY_START|REVIEW_START|PATTERNS_START|CHAT_INSIGHTS_START|GOALS_SUMMARY_START|PEOPLE_START|PEOPLE_NOTES_START|EVOLUTION_START|REFLECTIONS_START)>>>/;
+      const markerRe = /<<<(ENTRY_START|REVIEW_START|PATTERNS_START|CHAT_INSIGHTS_START|LESSONS_START|GOALS_SUMMARY_START|PEOPLE_START|PEOPLE_NOTES_START|EVOLUTION_START|REFLECTIONS_START)>>>/;
       const markerIdx = m.content.search(markerRe);
       const disp = markerIdx !== -1
         ? (m.content.slice(0, markerIdx).trim() || 'Content was ready.')
