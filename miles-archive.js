@@ -1542,96 +1542,34 @@ function closeMore() { document.getElementById('more-ov').classList.remove('show
 function ocMore(e)   { if (e.target === document.getElementById('more-ov')) closeMore(); }
 
 // ── Entry + state extraction ──────────────────────────────────────────────────
-function extractEntry(txt) {
-  const s = txt.indexOf('<<<ENTRY_START>>>');
-  const e = txt.indexOf('<<<ENTRY_END>>>');
+function extractBetween(txt, startMarker, endMarker) {
+  const s = txt.indexOf(startMarker);
+  const e = txt.indexOf(endMarker);
   if (s === -1 || e === -1) return null;
-  return txt.slice(s + 17, e).trim();
+  return txt.slice(s + startMarker.length, e).trim();
 }
 
-function extractState(txt) {
-  const s = txt.indexOf('<<<STATE_START>>>');
-  const e = txt.indexOf('<<<STATE_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 17, e).trim();
-}
-
-function extractPatterns(txt) {
-  const s = txt.indexOf('<<<PATTERNS_START>>>');
-  const e = txt.indexOf('<<<PATTERNS_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 20, e).trim();
-}
-
-function extractPeople(txt) {
-  const s = txt.indexOf('<<<PEOPLE_START>>>');
-  const e = txt.indexOf('<<<PEOPLE_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 18, e).trim();
-}
-
-function extractEvolution(txt) {
-  const s = txt.indexOf('<<<EVOLUTION_START>>>');
-  const e = txt.indexOf('<<<EVOLUTION_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 21, e).trim();
-}
-
-function extractChatInsights(txt) {
-  const s = txt.indexOf('<<<CHAT_INSIGHTS_START>>>');
-  const e = txt.indexOf('<<<CHAT_INSIGHTS_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 25, e).trim();
-}
-
-function extractLessons(txt) {
-  const s = txt.indexOf('<<<LESSONS_START>>>');
-  const e = txt.indexOf('<<<LESSONS_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 19, e).trim();
-}
-
-function extractThreads(txt) {
-  const s = txt.indexOf('<<<THREADS_START>>>');
-  const e = txt.indexOf('<<<THREADS_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 19, e).trim();
-}
-
-function extractPeopleNotes(txt) {
-  const s = txt.indexOf('<<<PEOPLE_NOTES_START>>>');
-  const e = txt.indexOf('<<<PEOPLE_NOTES_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 24, e).trim();
-}
-
-function extractGoalsSummary(txt) {
-  const s = txt.indexOf('<<<GOALS_SUMMARY_START>>>');
-  const e = txt.indexOf('<<<GOALS_SUMMARY_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 25, e).trim();
-}
-
-function extractReflections(txt) {
-  const s = txt.indexOf('<<<REFLECTIONS_START>>>');
-  const e = txt.indexOf('<<<REFLECTIONS_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 23, e).trim();
-}
-
-function extractReview(txt) {
-  const s = txt.indexOf('<<<REVIEW_START>>>');
-  const e = txt.indexOf('<<<REVIEW_END>>>');
-  if (s === -1 || e === -1) return null;
-  return txt.slice(s + 18, e).trim();
-}
+function extractEntry(txt)        { return extractBetween(txt, '<<<ENTRY_START>>>',          '<<<ENTRY_END>>>'); }
+function extractState(txt)        { return extractBetween(txt, '<<<STATE_START>>>',          '<<<STATE_END>>>'); }
+function extractPatterns(txt)     { return extractBetween(txt, '<<<PATTERNS_START>>>',       '<<<PATTERNS_END>>>'); }
+function extractPeople(txt)       { return extractBetween(txt, '<<<PEOPLE_START>>>',         '<<<PEOPLE_END>>>'); }
+function extractEvolution(txt)    { return extractBetween(txt, '<<<EVOLUTION_START>>>',      '<<<EVOLUTION_END>>>'); }
+function extractChatInsights(txt) { return extractBetween(txt, '<<<CHAT_INSIGHTS_START>>>', '<<<CHAT_INSIGHTS_END>>>'); }
+function extractLessons(txt)      { return extractBetween(txt, '<<<LESSONS_START>>>',        '<<<LESSONS_END>>>'); }
+function extractThreads(txt)      { return extractBetween(txt, '<<<THREADS_START>>>',        '<<<THREADS_END>>>'); }
+function extractPeopleNotes(txt)  { return extractBetween(txt, '<<<PEOPLE_NOTES_START>>>',   '<<<PEOPLE_NOTES_END>>>'); }
+function extractGoalsSummary(txt) { return extractBetween(txt, '<<<GOALS_SUMMARY_START>>>', '<<<GOALS_SUMMARY_END>>>'); }
+function extractReflections(txt)  { return extractBetween(txt, '<<<REFLECTIONS_START>>>',   '<<<REFLECTIONS_END>>>'); }
+function extractReview(txt)       { return extractBetween(txt, '<<<REVIEW_START>>>',         '<<<REVIEW_END>>>'); }
 
 function detectType(reply) {
   // Check the entry content (not the reply preamble) to avoid misfiling
   const entry = extractEntry(reply) || reply;
   const top   = entry.slice(0, 300);
-  if (/psychiatrist/i.test(top))                                return 'psychiatrist';
-  if (/rheumatologist/i.test(top))                              return 'rheumatologist';
+  // Require section heading to start with the specialty name — prevents false match
+  // when a daily entry mentions a doctor's appointment in the narrative
+  if (/^#\s*psychiatrist/im.test(entry))                        return 'psychiatrist';
+  if (/^#\s*rheumatologist/im.test(entry))                      return 'rheumatologist';
   if (/# Weekly/i.test(entry)  || /weekly review/i.test(top))  return 'weekly';
   if (/# Monthly/i.test(entry) || /monthly review/i.test(top)) return 'monthly';
   if (/goals/i.test(top))                                       return 'goals';
@@ -2372,6 +2310,7 @@ async function saveReflections() {
 function showSaveBar(entry, type) {
   S.pendingEntry = entry;
   S.pendingPath  = pathFor(type, S.sessionDate);
+  S._reviewFired = false; // allow patterns review for this entry even if a prior one fired this session
   document.getElementById('save-path').textContent = S.pendingPath;
   document.getElementById('save-go').disabled = false;
   document.getElementById('save-st').className = '';
@@ -2561,8 +2500,11 @@ async function sendMsg() {
     if (evolution)    disp = disp.replace(/<<<EVOLUTION_START>>>[\s\S]*?<<<EVOLUTION_END>>>/g, '').trim();
     if (reflections)  disp = disp.replace(/<<<REFLECTIONS_START>>>[\s\S]*?<<<REFLECTIONS_END>>>/g, '').trim();
     disp = disp.replace(/<<<FETCH_DEEP>>>/g, '').trim();
-    addMsg('assistant', disp || 'Done.');
-    S.messages.push({ role: 'assistant', content: reply });
+    const dispContent = disp || 'Done.';
+    addMsg('assistant', dispContent);
+    S.messages.push({ role: 'assistant', content: dispContent });
+    // First exchange complete — session openers are no longer needed in the system prompt
+    if (S.messages.length === 2) S._cachedSysPrompt = null;
     saveDraft();
     if (state) showStateBar(state);
     // First bar in cascade: review bar (review mode) or entry bar (daily mode)
@@ -2638,7 +2580,7 @@ function _clearAndStart() {
   S.reflections = null; S.pendingReflections = null; S._queuedReflections = null;
   S.reviewMode = false; S.pendingReview = null; S.existingReview = null; S.reviewLog = null;
   S._reviewFired = false; S._reviewRunning = false; S._deepContext = null; S._cachedSysPrompt = null;
-  S._pendingThreads = null;
+  S._pendingThreads = null; S._midSessionSummary = null; S._summaryCoversThrough = null; S._compressing = false;
   document.getElementById('pat-bar').classList.remove('show');
   document.getElementById('pat-st').className = '';
   document.getElementById('goals-summary-bar').classList.remove('show');

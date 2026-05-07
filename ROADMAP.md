@@ -1,6 +1,6 @@
 # miles-archive — Roadmap
 
-*Last updated: 2026-04-17*
+*Last updated: 2026-05-07*
 
 → Project overview and self-hosting: [README.md](README.md)
 → Implementation context for development: [CLAUDE.md](CLAUDE.md)
@@ -12,6 +12,8 @@ This file tracks feature status and planned work. Update it when features ship, 
 ## Planned
 
 - [ ] **Dynamic section monitoring** — console-log character/token estimates for `patterns.md`, `chat-insights.md`, `people-notes.md`, `people-profile.md` inside `getSysPrompt()`. Surface a warning when any section exceeds ~3000 tokens. Revisit when sessions feel heavy or costs tick up.
+- [ ] **Review mode system prompt persistence** — store `buildReviewPrompt` result in `S._reviewSysPrompt`; use it for all turns in review mode via `callClaude`, not just the opening exchange. Currently the daily-session prompt (with Bevel data, graymatter, protocol) is active for all follow-up turns.
+- [ ] **`_midSessionSummary` to system prompt** — inject as a third cached system block instead of prepending to the user message each turn. Saves ~800 tokens × N uncached input per call on long sessions. Requires moving injection out of `sendMsg` and into the `system` array in `callClaude`.
 
 ---
 
@@ -56,3 +58,4 @@ This file tracks feature status and planned work. Update it when features ship, 
 - [x] **Session memory compression** — drop zone / pinned message architecture; `_midSessionSummary` built incrementally and injected into every subsequent API call; `_compressing` guard prevents concurrent jobs *(Apr 2026)*
 - [x] **Save bar UX refactor** — Later/Discard split (Later retains pending state, Discard clears); pending badge on nav shows count of retained note updates; notes-bar removed *(Apr 2026)*
 - [x] **Lessons file** — `notes/lessons.md` write path via markers (`<<<LESSONS_START>>>` / `<<<LESSONS_END>>>`); `lessonsContext` injection + `lessonsUpdate` output (suppressed in brief and review mode); save bar after insights in daily cascade; strict qualification criteria + anti-duplication preflight; manual editing also supported *(Apr 17, 2026)*
+- [x] **Bug fixes: context hygiene + token efficiency** — push `disp` (stripped) not raw `reply` to `S.messages` so markers don't enter compression; `_clearAndStart` now resets `_midSessionSummary`, `_summaryCoversThrough`, `_compressing`; session openers dropped from system prompt cache after first exchange; `_reviewFired` reset on each new entry bar so same-day continuation entries each get a patterns review; extract functions unified via `extractBetween` helper (dynamic offsets, no hardcoded lengths); `detectType` narrowed to `^# Psychiatrist/Rheumatologist` heading match to prevent narrative misfiling *(May 7, 2026)*
